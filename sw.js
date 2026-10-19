@@ -1,5 +1,5 @@
 /* ORBIT 서비스 워커: 온라인이면 항상 최신 파일, 오프라인이면 캐시로 열립니다. 설치형 앱(PWA) 요건도 충족합니다. */
-const CACHE = "orbit-v9";
+const CACHE = "orbit-v10";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest", "./css/style.css",
   "./js/utils.js", "./js/bodies.js", "./js/icons.js", "./js/store.js", "./js/gl.js", "./js/gl3d.js", "./js/fx.js", "./js/scene.js", "./js/panel.js", "./js/calendar.js", "./js/board.js", "./js/now.js", "./js/listview.js", "./js/app.js",
