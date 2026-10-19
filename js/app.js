@@ -79,8 +79,8 @@ const App = {
   coach(show) {
     const el = $("#coach"); if (!show) { el.hidden = true; Store.setSetting("coachSeen", true); return; }
     const touch = Scene.touch, rows = touch
-      ? [["한 손가락 드래그", "빈 공간을 끌면 시점이 돌아가요"], ["두 손가락", "오므리거나 벌려서 확대·축소해요"], ["행성 탭", "가까이 다가가 할 일을 보여 줘요"], ["위성 두 번 탭", "잡은 뒤 태양을 탭하면 집중, 다른 행성을 탭하면 이동 · 꾹 눌러 끌어도 돼요"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 탭", "전체 보기로 돌아가요"]]
-      : [["드래그", "빈 공간을 끌면 시점이 돌아가요"], ["휠", "확대하고 축소해요"], ["행성 클릭", "가까이 다가가 할 일을 보여 줘요"], ["위성 두 번 클릭", "잡은 뒤 태양을 클릭하면 집중, 다른 행성을 클릭하면 이동 · 꾹 눌러 끌어도 돼요"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 클릭", "전체 보기로 돌아가요"]];
+      ? [["한 손가락 드래그", "빈 공간을 끌면 시점이 돌아가요"], ["두 손가락", "오므리거나 벌려서 확대·축소해요"], ["행성 탭", "가까이 다가가 할 일을 보여 줘요"], ["두 번 눌러 끌기", "위성을 한 번 탭하고 다시 누른 채 끌어요. 태양에 놓으면 집중, 다른 행성에 놓으면 이동 · 꾹 눌러 끌어도 돼요"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 탭", "전체 보기로 돌아가요"]]
+      : [["드래그", "빈 공간을 끌면 시점이 돌아가요"], ["휠", "확대하고 축소해요"], ["행성 클릭", "가까이 다가가 할 일을 보여 줘요"], ["두 번 눌러 끌기", "위성을 한 번 클릭하고 다시 누른 채 끌어요. 태양에 놓으면 집중, 다른 행성에 놓으면 이동 · 꾹 눌러 끌어도 돼요"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 클릭", "전체 보기로 돌아가요"]];
     el.innerHTML = `<div class="coach-h"><span>조작 안내</span><button type="button" class="icon-btn plain sm" data-act="close" aria-label="닫기">${ico("x", 16)}</button></div>
       <ul class="coach-list">${rows.map(([k, v]) => `<li><span class="ck">${k}</span><span>${v}</span></li>`).join("")}</ul>
       ${touch ? "" : `<div class="coach-keys"><kbd>N</kbd> 새 할 일 <kbd>/</kbd> 검색 <kbd>3</kbd> 목록 <kbd>0</kbd> 전체 보기 <kbd>R</kbd> 자동 회전</div>`}
@@ -91,7 +91,7 @@ const App = {
   onKey(e) {
     const ae = document.activeElement, typing = ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable);
     if (e.key === "Escape") {
-      if (Scene.cancelCarry()) return;
+      if (Scene.cancelDrag()) return;
       if (Board.closeM()) return;
       if (!$("#palette").hidden) return Palette.close();
       if (!$("#modal").hidden) return Modal.close();

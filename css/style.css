@@ -835,8 +835,6 @@ body.sheet-open:not(.narrow) .listview { right: calc(var(--sheet-w) + 24px); }
 .p-label.down .pl-box { bottom: auto; top: 14px; padding: 4px 2px 0 4px; border-bottom: 0; border-top: 1px solid rgba(255, 255, 255, 0.34); }
 .p-label.flip.down .pl-box { padding: 4px 4px 0 2px; }
 .p-label.hot .pl-box { border-color: var(--c); }
-body.carrying, body.carrying * { cursor: grabbing !important; }
-body.carrying .p-label .pl-box, body.carrying .mtag { pointer-events: none; }
 .drag-ghost.lift .g-title { animation: fade 0.2s; }
 @media (max-width: 639.98px) {
   .pl-row { height: 20px; font-size: 11.5px; }
@@ -844,7 +842,7 @@ body.carrying .p-label .pl-box, body.carrying .mtag { pointer-events: none; }
   .pl-list { margin-top: 3px; }
 }
 .pl-list { transition: opacity 0.2s; }
-body.dragging .pl-list, body.carrying .pl-list { opacity: 0.3; }
+body.dragging .pl-list { opacity: 0.3; }
 
 /* ───────── 휴대폰: 오늘 할 일 버튼 + 아래에서 올라오는 보드 ───────── */
 .board-pill { position: fixed; z-index: 16; left: 8px; top: calc(100px + env(safe-area-inset-top, 0px)); display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 11px 0 10px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--ink); background: var(--panel); border: 1px solid var(--line-2); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35); transition: background 0.12s, border-color 0.12s; }

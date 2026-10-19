@@ -10,7 +10,7 @@ const Scene = {
   systems: new Map(), order: [], orbs: new Map(), hover: null, drag: null, carousel: 0, spin: 1,
   par: { x: 0, y: 0, tx: 0, ty: 0 }, narrow: false, touch: false, reduced: false, panelOpen: false, area: null,
   lastPos: new Map(), launch: null, q: 1, perf: { ema: 1 / 60, t: 0 }, idleAt: 0,
-  SHELL_CAP: [6, 9, 12, 16, 22], HOLD: 380, DBL: 330, nowH: 0,
+  SHELL_CAP: [6, 9, 12, 16, 22], HOLD: 380, DBL: 450, nowH: 0,
   v3d: { az: 0, el: 0, zoom: 1, taz: 0, tel: 0, tzoom: 1 }, focusId: null, fRef: null, ft: 0, autoRotate: true, orbitDrag: null, pinch: null, ptrs: new Map(),
 
   init() {
@@ -199,8 +199,7 @@ const Scene = {
   updateHint() {
     const el = this.hint, d = this.drag && !this.drag.pending ? this.drag : null;
     let txt = "", sub = "";
-    if (d && d.sticky) { const tap = this.touch ? "탭" : "클릭"; txt = d.sunTarget ? `${tap}하면 점화돼요` : d.target ? `${tap}하면 ${d.target.planet.name}${U.josa(d.target.planet.name, "으로", "로")} 옮겨요` : `놓을 곳을 ${tap}하세요`; sub = d.kind === "orb" ? "행성: 궤도로 복귀 · 빈 곳: 취소" : `태양: 집중 · 다른 행성: 이동 · 빈 곳${this.touch ? "" : "이나 Esc"}: 취소`; }
-    else if (d) { txt = d.kind === "orb" ? "행성에 놓으면 궤도로 돌아가요" : d.sunTarget ? "놓으면 점화돼요" : "태양에 놓으면 집중을 시작해요"; sub = d.kind === "orb" ? "타이머는 일시정지돼요" : "다른 행성에 놓으면 카테고리가 바뀌어요"; }
+    if (d) { txt = d.kind === "orb" ? "행성에 놓으면 궤도로 돌아가요" : d.sunTarget ? "놓으면 점화돼요" : "태양에 놓으면 집중을 시작해요"; sub = d.kind === "orb" ? "타이머는 일시정지돼요" : "다른 행성에 놓으면 카테고리가 바뀌어요"; }
     else if (!this.orbs.size && !this.focusId) {
       const any = [...this.systems.values()].some(s => s.moons.size);
       txt = any ? "위성을 태양으로 끌어 오세요" : (this.view === "today" ? "오늘 남은 할 일이 없어요" : "할 일이 없어요");
@@ -356,6 +355,7 @@ const Scene = {
       FX.dust(dt, this.par.x, this.par.y, this.reduced);
       if (this.drag && !this.drag.pending) this.drawTargets(ctx);
       if (this.drag && this.drag.pending && this.drag.hold) this.drawHold(ctx, this.drag);
+      if (this._click && !this.drag) this.drawArm(ctx);
       if (this.sun.heat > 0.03 && !this.reduced) { const rate = (4 + this.sun.heat * 34) * dt; let n = Math.floor(rate) + (Math.random() < rate % 1 ? 1 : 0); while (n-- > 0) FX.ember(this.sun.sx, this.sun.sy, this.sun.sr, this.sun.heat); }
     }
     FX.update(dt); FX.draw();
@@ -460,6 +460,15 @@ const Scene = {
     const tw = this.tagW || (this.tagW = new Map());
     pool.forEach((el, i) => { const it = items[i]; if (it && !el._w) { el._w = el.offsetWidth; tw.set(it.m.id, el._w); } });
   },
+  /* 첫 번째 클릭 직후: 다시 누르면 잡을 수 있다는 흰 고리 (잠깐 퍼지며 사라짐) */
+  drawArm(ctx) {
+    const c = this._click, p = (performance.now() - c.t) / this.DBL; if (p > 1) return;
+    let o = c.kind === "orb" ? this.orbs.get(c.id) : null;
+    if (!o) for (const s of this.systems.values()) if (s.moons.has(c.id)) o = s.moons.get(c.id);
+    if (!o) return;
+    ctx.save(); ctx.globalAlpha = 0.95 * (1 - p * p); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(o.sx, o.sy, Math.max(o.sr, 5) + 7 + p * 5, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  },
   /* 꾹 누르는 동안 위성 둘레에 차오르는 고리 */
   drawHold(ctx, d) {
     const p = (performance.now() - d.t0) / this.HOLD; if (p < 0.15 || p > 1.05) return;
@@ -555,7 +564,7 @@ const Scene = {
     if (t.priority) meta.push(`<span style="color:${PRIO[t.priority].color}">${prioSvg(t.priority, 12)}${PRIO[t.priority].ko}</span>`);
     if (t.steps.length) meta.push(`<span>${ico("list", 12)}${t.steps.filter(s => s.done).length}/${t.steps.length}</span>`);
     if (t.repeat && t.repeat !== "none") meta.push(`<span>${ico("repeat", 12)}반복</span>`);
-    this.tip.innerHTML = `<div class="tt-top"><i style="--c:${p ? pColor(p) : "#fff"}"></i>${U.esc(p ? p.name : "")}</div><div class="tt-title">${U.esc(t.title)}</div>${meta.length ? `<div class="tt-meta">${meta.join("")}</div>` : ""}<div class="tt-hint">${h.kind === "orb" ? "클릭: 열기 · 두 번 클릭하거나 꾹 눌러 잡고 행성에 놓으면 궤도 복귀" : "클릭: 열기 · 두 번 클릭하거나 꾹 눌러 잡기"}</div>`;
+    this.tip.innerHTML = `<div class="tt-top"><i style="--c:${p ? pColor(p) : "#fff"}"></i>${U.esc(p ? p.name : "")}</div><div class="tt-title">${U.esc(t.title)}</div>${meta.length ? `<div class="tt-meta">${meta.join("")}</div>` : ""}<div class="tt-hint">${h.kind === "orb" ? "클릭: 열기 · 다시 누른 채 끌거나 꾹 눌러 끌어 행성에 놓으면 궤도 복귀" : "클릭: 열기 · 한 번 누르고 다시 누른 채 끌기, 또는 꾹 눌러 끌기"}</div>`;
     this.tip.hidden = false;
   },
 
@@ -609,7 +618,7 @@ const Scene = {
     }
     if (e.pointerType !== "mouse") { const ns = this.nearSystem(x, y); this.systems.forEach(s => { s.pinned = s === ns; }); }
     let hit = this.pick(x, y); const c = this._click;
-    if (c && performance.now() - c.t < this.DBL && Math.hypot(x - c.x, y - c.y) < 18 && (!hit || hit.id !== c.id)) hit = { kind: c.kind, id: c.id, sys: c.sysId ? this.systems.get(c.sysId) : null };
+    if (c && performance.now() - c.t < this.DBL && Math.hypot(x - c.x, y - c.y) < (e.pointerType === "mouse" ? 22 : 30) && (!hit || hit.id !== c.id)) hit = { kind: c.kind, id: c.id, sys: c.sysId ? this.systems.get(c.sysId) : null };
     if (!hit) { e.preventDefault(); this.startOrbit(x, y, e.pointerId); return; }
     this.startPending(e, { kind: hit.kind, id: hit.id, sysId: hit.sys ? hit.sys.id : null });
   },
@@ -663,8 +672,8 @@ const Scene = {
   },
   onUp(e) {
     const d = this.drag; if (!d) return;
-    /* 두 번 눌러 잡고 그대로 떼면: 손을 떼도 위성이 따라다니고, 다음 클릭 자리에 놓인다 */
-    if (d.dbl && !d.sticky && e.type === "pointerup" && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 12) { this.carry(d); return; }
+    /* 한 번 누르고 다시 누른 채 끌어 놓기. 두 번째에 끌지 않고 떼면 그냥 더블클릭이라 상세를 연다 */
+    if (d.dbl && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 12) { this.endDrag(); if (e.type === "pointerup") App.openTask(d.id); return; }
     this.endDrag();
     if (d.pending) {
       if (d.kind === "moon" || d.kind === "orb") {
@@ -677,20 +686,7 @@ const Scene = {
     if (e.type === "pointercancel") return;
     this.drop(d, e);
   },
-  carry(d) {
-    d.sticky = true; document.body.classList.add("carrying");
-    window.removeEventListener("pointerup", this._up); window.removeEventListener("pointercancel", this._up);
-    this._cd = ev => {
-      ev.preventDefault(); ev.stopPropagation();
-      const swallow = c => { c.stopPropagation(); c.preventDefault(); };
-      window.addEventListener("click", swallow, { capture: true, once: true }); setTimeout(() => window.removeEventListener("click", swallow, true), 450);
-      if (ev.pointerType === "mouse" && ev.button !== 0) { this.endDrag(); return; }
-      this.onDragMove(ev); const dd = this.drag; this.endDrag(); if (dd) this.drop(dd, ev);
-    };
-    window.addEventListener("pointerdown", this._cd, true);
-    this.updateHint();
-  },
-  cancelCarry() { if (this.drag && this.drag.sticky) { this.endDrag(); return true; } return false; },
+  cancelDrag() { if (this.drag && !this.drag.pending) { this.endDrag(); return true; } return false; },
   drop(d, e) {
     this.ghost.classList.remove("lift");
     const t = Store.task(d.id); if (!t) return;
@@ -705,7 +701,6 @@ const Scene = {
   endDrag() {
     clearTimeout(this._hold);
     window.removeEventListener("pointermove", this._mv); window.removeEventListener("pointerup", this._up); window.removeEventListener("pointercancel", this._up);
-    if (this._cd) { window.removeEventListener("pointerdown", this._cd, true); this._cd = null; } document.body.classList.remove("carrying");
     this.drag = null; this.ghost.classList.remove("lift"); this.ghost.hidden = true; this.ghost.classList.remove("over-sun"); document.body.classList.remove("dragging");
     this.systems.forEach(s => { s.hover = false; });
     this.focus.querySelectorAll(".lifted").forEach(c => c.classList.remove("lifted"));
