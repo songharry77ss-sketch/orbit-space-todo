@@ -21,7 +21,7 @@ const Panel = {
   close() {
     if (this.el.hidden) return;
     this.el.hidden = true; this.mode = null; this.id = null; this._key = "";
-    document.body.classList.remove("sheet-open"); Scene.setPanel(false);
+    document.body.classList.remove("sheet-open"); Scene.setPanel(false); Scene.focusOn(null);
   },
   refresh() {
     if (!this.mode) return;

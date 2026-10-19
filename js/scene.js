@@ -11,6 +11,7 @@ const Scene = {
   par: { x: 0, y: 0, tx: 0, ty: 0 }, narrow: false, touch: false, reduced: false, panelOpen: false, area: null,
   lastPos: new Map(), launch: null, q: 1, perf: { ema: 1 / 60, t: 0 }, idleAt: 0,
   SHELL_CAP: [6, 9, 12, 16, 22],
+  v3d: { az: 0, el: 0, zoom: 1, taz: 0, tel: 0, tzoom: 1 }, focusId: null, fRef: null, ft: 0, autoRotate: true, orbitDrag: null, pinch: null, ptrs: new Map(),
 
   init() {
     this.stage = document.getElementById("stage"); this.cvGL = document.getElementById("gl");
@@ -18,7 +19,7 @@ const Scene = {
     this.focus = document.getElementById("focus"); this.tip = document.getElementById("tooltip");
     this.ghost = document.getElementById("dragGhost"); this.hint = document.getElementById("sunHint");
     this.reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    this.showNames = !!Store.state.settings.moonNames;
+    this.showNames = !!Store.state.settings.moonNames; this.autoRotate = Store.state.settings.autoRotate !== false;
     this.useGL = GL.init(this.cvGL);
     document.body.classList.toggle("no-gl", !this.useGL);
     FX.init(document.getElementById("fx"));
@@ -66,9 +67,9 @@ const Scene = {
     this.cam.tEl = U.lerp(1.0, 0.44, U.clamp((asp - 0.6) / 1.1, 0, 1));
     this.fitCamera();
   },
-  matrices(D, el, az, sx, sy) {
-    const eye = [Math.sin(az) * Math.cos(el) * D, Math.sin(el) * D, Math.cos(az) * Math.cos(el) * D];
-    const V = M4.lookAt(eye, [0, 0, 0], [0, 1, 0]), P = M4.persp(this.cam.fov, this.W / this.H, Math.max(0.5, D * 0.05), D * 4 + 120, sx, sy);
+  matrices(D, el, az, sx, sy, tg = [0, 0, 0]) {
+    const eye = [tg[0] + Math.sin(az) * Math.cos(el) * D, tg[1] + Math.sin(el) * D, tg[2] + Math.cos(az) * Math.cos(el) * D];
+    const V = M4.lookAt(eye, tg, [0, 1, 0]), P = M4.persp(this.cam.fov, this.W / this.H, Math.max(0.5, D * 0.05), D * 4 + 120, sx, sy);
     return { eye, V, P, VP: M4.mul(P, V) };
   },
   /* 모든 궤도(위성·라벨 여유 포함)가 사용 가능한 화면 영역에 들어가도록 거리와 렌즈 시프트를 찾는다 */
@@ -99,12 +100,13 @@ const Scene = {
   },
 
   /* ── 스토어 → 씬 ── */
-  setView(v) { this.view = v; this.sync({ type: "filter" }); },
+  setView(v) { this.view = v; if (v === "calendar") this.focusOn(null); this.sync({ type: "filter" }); },
   setSearch(q) { this.search = (q || "").trim().toLowerCase(); },
   shellOf(i) { let acc = 0; for (let k = 0; k < this.SHELL_CAP.length; k++) { acc += this.SHELL_CAP[k]; if (i < acc) return k; } return this.SHELL_CAP.length - 1; },
   sync(d = {}) {
     const planets = Store.planets(), ids = new Set(planets.map(p => p.id));
     for (const [id, s] of this.systems) if (!ids.has(id)) { s.label.remove(); this.systems.delete(id); }
+    if (this.focusId && !this.systems.has(this.focusId)) this.focusOn(null);
     planets.forEach(p => {
       let s = this.systems.get(p.id); if (!s) s = this.makeSystem(p);
       s.planet = p; s.body = bodyOf(p); s.key = bodyKey(p); s.tint = hexRGB(s.body.color); s.oc = s.tint.map(v => 0.55 + v * 0.45);
@@ -182,7 +184,7 @@ const Scene = {
     const el = this.hint, d = this.drag && !this.drag.pending ? this.drag : null;
     let txt = "", sub = "";
     if (d) { txt = d.kind === "orb" ? "행성에 놓으면 궤도로 돌아가요" : d.sunTarget ? "놓으면 점화돼요" : "태양에 놓으면 집중을 시작해요"; sub = d.kind === "orb" ? "타이머는 일시정지돼요" : "다른 행성에 놓으면 카테고리가 바뀌어요"; }
-    else if (!this.orbs.size) {
+    else if (!this.orbs.size && !this.focusId) {
       const any = [...this.systems.values()].some(s => s.moons.size);
       txt = any ? "위성을 태양으로 끌어 오세요" : (this.view === "today" ? "오늘 남은 할 일이 없어요" : "할 일이 없어요");
       sub = any ? "놓는 순간 집중 타이머가 시작돼요" : "아래 입력창에서 새 할 일을 추가해 보세요";
@@ -215,20 +217,37 @@ const Scene = {
     const t = this.time, cam = this.cam, sun = this.sun, k = Math.min(1, dt * 2.2), fl = this.reduced ? 0 : 1;
     this.par.x += (this.par.tx - this.par.x) * Math.min(1, dt * 1.6); this.par.y += (this.par.ty - this.par.y) * Math.min(1, dt * 1.6);
     const px = this.touch ? 0 : this.par.x, py = this.touch ? 0 : this.par.y;
-    let busy = !!this.drag || (this.hover && this.hover.kind !== "sun");
+    let busy = !!this.drag || !!this.orbitDrag || !!this.focusId || this.panelOpen || !this.autoRotate || (this.hover && this.hover.kind !== "sun");
     for (const s of this.systems.values()) if (s.hover || s.labelHover || s.pinned) busy = true;
     this.spin += ((this.reduced || busy ? 0 : 1) - this.spin) * Math.min(1, dt * 1.5);
     this.carousel += dt * this.spin * (Math.PI * 2 / 600);
     cam.dist += (cam.tDist - cam.dist) * k; cam.sx += (cam.tsx - cam.sx) * k; cam.sy += (cam.tsy - cam.sy) * k; cam.el += (cam.tEl - cam.el) * k;
-    const az = cam.az0 + Math.sin(t * 0.06) * 0.03 * fl + px * 0.09, el = cam.el + Math.sin(t * 0.045 + 1) * 0.012 * fl - py * 0.05;
-    const mt = this.matrices(cam.dist, el, az, cam.sx, cam.sy);
+    /* 사용자 시점(회전·확대)과 포커스 모드를 부드럽게 섞는다 */
+    const v = this.v3d, kv = Math.min(1, dt * 7);
+    v.az += (v.taz - v.az) * kv; v.el += (v.tel - v.el) * kv; v.zoom += (v.tzoom - v.zoom) * Math.min(1, dt * 6);
+    const fs = this.focusId ? this.systems.get(this.focusId) : null; if (fs) this.fRef = fs;
+    const dragOut = this.drag && !this.drag.pending && this.drag.kind === "moon";
+    this.ft += ((fs && !dragOut ? 1 : 0) - this.ft) * Math.min(1, dt * 2.6);
+    const fe = this.ft * this.ft * (3 - 2 * this.ft), fr = this.fRef && this.systems.has(this.fRef.id) ? this.fRef : null;
+    let tg = [0, 0, 0], D = cam.dist, sx = cam.sx, sy = cam.sy, elB = cam.el, azF = 0;
+    if (fr && fe > 0.001) {
+      const c = this.areaCenter(); tg = V3.scale(fr.p, fe); D = U.lerp(cam.dist, this.focusDist(fr), fe); sx = U.lerp(cam.sx, c[0], fe); sy = U.lerp(cam.sy, c[1], fe); elB = U.lerp(cam.el, Math.min(cam.el, 0.42), fe);
+      if (fr.faz == null || !fs) fr.faz = Math.atan2(fr.p[0], fr.p[2]) + 0.6;
+      let d = fr.faz - (cam.az0 + v.az); d = Math.atan2(Math.sin(d), Math.cos(d)); azF = d * fe;
+    }
+    if (!fs && this.fRef) this.fRef.faz = null;
+    D *= v.zoom; this.fe = fe;
+    const az = cam.az0 + v.az + azF + Math.sin(t * 0.06) * 0.03 * fl + px * 0.09 * (1 - fe * 0.6);
+    const el = U.clamp(elB + v.el + Math.sin(t * 0.045 + 1) * 0.012 * fl - py * 0.05, 0.06, 1.45);
+    cam.azNow = az; cam.elNow = el;
+    const mt = this.matrices(D, el, az, sx, sy, tg);
     cam.eye = mt.eye; cam.V = mt.V; cam.P = mt.P; cam.VP = mt.VP; cam.inv = null; cam.focal = this.H / 2 / Math.tan(cam.fov / 2);
     sun.heat += (sun.heatT - sun.heat) * Math.min(1, dt * 1.4);
     const sp = this.project(sun.p); sun.sx = sp.x; sun.sy = sp.y; sun.w = sp.w; sun.sr = sun.R * cam.focal / sp.w;
     for (const s of this.systems.values()) {
       const ang = s.ang0 + this.carousel, bob = Math.sin(t * s.bob[1] + s.bob[0]) * 0.24 * fl;
       s.p = V3.lerp(s.p, [Math.cos(ang) * s.orbit, bob, Math.sin(ang) * s.orbit], Math.min(1, dt * (t - s.born < 3 ? 2.4 : 4)));
-      const want = (s.hover || s.labelHover || s.pinned || (this.drag && this.drag.target === s)) ? 1 : 0;
+      const want = (s.hover || s.labelHover || s.pinned || s.id === this.focusId || (this.drag && this.drag.target === s)) ? 1 : 0;
       s.h += (want - s.h) * Math.min(1, dt * 5);
       s.rot = s.rot0 + t * Math.PI * 2 / s.body.spin;
       const pp = this.project(s.p); s.sx = pp.x; s.sy = pp.y; s.w = pp.w; s.sr = s.R * cam.focal / pp.w;
@@ -275,7 +294,8 @@ const Scene = {
   renderGL() {
     const t = this.time, tt = t % 3600, cal = this.view === "calendar", sun = this.sun, d = this.drag && !this.drag.pending ? this.drag : null;
     GL.begin();
-    GL.drawBg({ sky: this.skyTex(), time: t, off: [this.par.x * 40, this.par.y * 30], dim: cal ? 0.5 : 1, exp: 1.9, stars: 1 });
+    const yaw = (this.cam.azNow || 0) - this.cam.az0, pitch = (this.cam.elNow || this.cam.el) - this.cam.el;
+    GL.drawBg({ sky: this.skyTex(), time: t, off: [this.par.x * 40 - yaw * this.W * 0.55, this.par.y * 30 + pitch * this.H * 0.55], rot: [-yaw / (Math.PI * 2), pitch * 0.12], dim: cal ? 0.5 : 1, exp: 1.9, stars: 1 });
     if (cal) return;
     G3.frame(this.cam); G3.opaque();
     const heat = Math.max(sun.heat, d && d.sunTarget ? 0.45 : 0);
@@ -300,7 +320,7 @@ const Scene = {
       if (s.body.atmK) { const dx = sun.sx - s.sx, dy = sun.sy - s.sy, l = Math.hypot(dx, dy) || 1; G3.drawGlow({ pos: s.p, size: s.Rd * 1.4, mode: 1, scale: 1.4, color: s.body.atm, k: s.body.atmK, ld: [dx / l, -dy / l] }); }
       for (const m of s.moons.values()) {
         if (d && d.id === m.id) continue;
-        const hov = this.hover && this.hover.id === m.id, late = Store.isOverdue(m.task);
+        const hov = (this.hover && this.hover.id === m.id) || (Panel.mode === "task" && Panel.id === m.id), late = Store.isOverdue(m.task);
         if (!hov && !late && !m.task.important) continue;
         const c = hov ? [1, 1, 1] : late ? [1, 0.36, 0.42] : [1, 0.78, 0.4], kk = hov ? 1 : late ? 0.7 + 0.3 * Math.sin(t * 3.5) : 0.85;
         G3.drawGlow({ pos: m.p, size: this.moonR(m.task) * 2.1, mode: 2, scale: 2.1, color: c, k: kk });
@@ -326,9 +346,10 @@ const Scene = {
     const W = this.W, near = Math.min(...[...this.systems.values()].map(s => s.w)), far = Math.max(...[...this.systems.values()].map(s => s.w));
     for (const s of this.systems.values()) {
       const flip = s.sx > W - 210 && s.sx > W / 2, k = 0.72, ax = s.sx + (flip ? -1 : 1) * s.sr * k, ay = s.sy - s.sr * k;
-      s.label.classList.toggle("flip", flip); s.label.classList.toggle("hot", s.h > 0.5); s.label.classList.toggle("hid", s.hidden);
+      s.label.classList.toggle("flip", flip); s.label.classList.toggle("hot", s.h > 0.5); s.label.classList.toggle("hid", s.hidden || (s.id === this.focusId && this.fe > 0.5));
       s.label.style.transform = `translate3d(${ax.toFixed(1)}px, ${ay.toFixed(1)}px, 0)`;
-      const depth = far > near ? (s.w - near) / (far - near) : 0; s.label.style.setProperty("--dim", (1 - depth * 0.35).toFixed(2));
+      const depth = far > near ? (s.w - near) / (far - near) : 0, other = this.focusId && s.id !== this.focusId;
+      s.label.style.setProperty("--dim", (other ? 0.32 : 1 - depth * 0.35).toFixed(2));
     }
     this.placeTags();
     const sun = this.sun;
@@ -345,21 +366,34 @@ const Scene = {
   },
   /* 위성 옆 할 일 이름: 행성에 올렸을 때(또는 설정에서 항상) 보여 준다 */
   placeTags() {
-    const pool = this.tagPool || (this.tagPool = []), items = [];
-    if (this.view !== "calendar" && !(this.drag && !this.drag.pending)) for (const s of this.systems.values()) {
-      if (!(this.showNames || s.h > 0.55)) continue;
-      for (const m of s.moons.values()) if (!m.hidden && m.match && m.sr > 1.5) { const left = m.sx < s.sx; items.push({ m, s, left, x: left ? m.sx - m.sr - 7 : m.sx + m.sr + 7, y: m.sy, a: this.showNames && s.h < 0.55 ? 0.7 : 1 }); }
+    const pool = this.tagPool || (this.tagPool = []), items = [], dragging = this.drag && !this.drag.pending;
+    if (this.view !== "calendar" && !dragging) for (const s of this.systems.values()) {
+      const live = s.h > 0.55; if (!(this.showNames || live)) continue;
+      for (const m of s.moons.values()) if (!m.hidden && m.match && m.sr > 1.5) {
+        const w = (this.tagW && this.tagW.get(m.id)) || 140; let left = m.sx < s.sx;
+        if (left && m.sx - m.sr - 8 - w < 6) left = false; else if (!left && m.sx + m.sr + 8 + w > this.W - 6) left = true;
+        items.push({ m, s, left, live, x: left ? m.sx - m.sr - 8 : m.sx + m.sr + 8, y: m.sy, a: live ? 1 : 0.72 });
+      }
     }
     items.sort((a, b) => a.y - b.y);
-    for (let i = 1; i < items.length; i++) for (let j = 0; j < i; j++) { const a = items[j], b = items[i]; if (a.left === b.left && Math.abs(a.x - b.x) < 120 && b.y - a.y < 18) b.y = a.y + 18; }
-    while (pool.length < items.length) { const el = document.createElement("div"); el.className = "mtag"; this.tags.appendChild(el); pool.push(el); }
+    for (let i = 1; i < items.length; i++) for (let j = 0; j < i; j++) { const a = items[j], b = items[i]; if (a.left === b.left && Math.abs(a.x - b.x) < 150 && b.y - a.y < 24) b.y = a.y + 24; }
+    while (pool.length < items.length) {
+      const el = document.createElement("div"); el.className = "mtag";
+      el.innerHTML = `<span class="mt-t"></span><button type="button" class="mt-go" aria-label="태양에 올려 집중 시작" title="태양에 올려 집중 시작">${ico("flame", 13)}</button>`;
+      el._tt = el.firstChild; this.tags.appendChild(el); pool.push(el);
+    }
     pool.forEach((el, i) => {
       const it = items[i]; if (!it) { if (!el.hidden) el.hidden = true; return; }
-      el.hidden = false; const txt = it.m.task.title;
-      if (el._t !== txt) { el._t = txt; el.textContent = txt.length > 18 ? txt.slice(0, 17) + "…" : txt; }
-      el.classList.toggle("late", Store.isOverdue(it.m.task)); el.classList.toggle("imp", !!it.m.task.important);
+      el.hidden = false; const tk = it.m.task, txt = tk.title;
+      if (el._t !== txt || el._live !== it.live) { el._t = txt; el._live = it.live; el._tt.textContent = txt.length > 20 ? txt.slice(0, 19) + "…" : txt; el._w = 0; }
+      if (el.dataset.id !== it.m.id) { el.dataset.id = it.m.id; el.dataset.sys = it.s.id; el._w = 0; }
+      el.classList.toggle("late", Store.isOverdue(tk)); el.classList.toggle("imp", !!tk.important); el.classList.toggle("live", it.live); el.classList.toggle("left", it.left);
+      el.classList.toggle("sel", !!((this.hover && this.hover.id === it.m.id) || (Panel.mode === "task" && Panel.id === it.m.id)));
       el.style.opacity = it.a; el.style.transform = `translate3d(${it.x.toFixed(1)}px, ${it.y.toFixed(1)}px, 0) translate(${it.left ? -100 : 0}%, -50%)`;
     });
+    /* 폭은 글자가 바뀔 때만 다시 잰다 */
+    const tw = this.tagW || (this.tagW = new Map());
+    pool.forEach((el, i) => { const it = items[i]; if (it && !el._w) { el._w = el.offsetWidth; tw.set(it.m.id, el._w); } });
   },
   drawTargets(ctx) {
     const d = this.drag, t = this.time, sun = this.sun;
@@ -377,9 +411,48 @@ const Scene = {
     ctx.restore();
   },
 
+  /* ── 시점 조작 · 포커스 ── */
+  focusOn(id) {
+    if (id && (!this.systems.has(id) || this.view === "calendar")) id = null;
+    this.focusId = id;
+    const chip = document.getElementById("focusChip");
+    if (!id) { chip.hidden = true; return; }
+    const s = this.systems.get(id);
+    chip.innerHTML = `<button type="button" class="fc-back" data-act="back">${ico("chevLeft", 15)}전체 보기</button><span class="fc-sep"></span>${thumbImg(s.key, 18)}<span class="fc-name">${U.esc(s.planet.name)}</span><span class="fc-en">${s.body.ko}</span>`;
+    chip.hidden = false;
+  },
+  focusDist(s) {
+    const a = this.area, hw = (a.right - a.left) / this.W, hh = (a.bottom - a.top) / this.H, asp = this.W / this.H;
+    const E = (s.shells ? this.shellR(s, s.shells - 1) * 1.16 : s.R * 1.4) + s.R * 0.5 + 0.9;
+    return Math.max(E * 2.2, E / (Math.tan(this.cam.fov / 2) * Math.min(hh, hw * asp) * 0.7));
+  },
+  areaCenter() { const a = this.area; return [(a.left + a.right) / this.W - 1, 1 - (a.top + a.bottom) / this.H]; },
+  resetView() { const v = this.v3d, TAU = Math.PI * 2; v.taz = Math.round(v.az / TAU) * TAU; v.tel = 0; v.tzoom = 1; this.focusOn(null); },
+  zoomBy(f) { this.v3d.tzoom = U.clamp(this.v3d.tzoom * f, 0.45, 1.8); },
+  rotateBy(da, de) { this.v3d.taz += da; this.v3d.tel = U.clamp(this.v3d.tel + de, -0.38, 0.75); },
+  setAutoRotate(on) { this.autoRotate = on; Store.setSetting("autoRotate", on); App.paintSpin(); },
+  /* 빈 공간을 끌면 시점 회전, 제자리에서 두 번 누르면 전체 보기 */
+  startOrbit(e) {
+    e.preventDefault();
+    this.orbitDrag = { x0: e.clientX, y0: e.clientY, az0: this.v3d.taz, el0: this.v3d.tel, moved: false, id: e.pointerId };
+    const mv = ev => {
+      const o = this.orbitDrag; if (!o || ev.pointerId !== o.id || this.pinch) return;
+      const dx = ev.clientX - o.x0, dy = ev.clientY - o.y0; if (!o.moved && Math.hypot(dx, dy) < 4) return;
+      o.moved = true; document.body.classList.add("orbiting");
+      this.v3d.taz = o.az0 - dx * 0.0055; this.v3d.tel = U.clamp(o.el0 + dy * 0.0045, -0.38, 0.75);
+    };
+    const up = ev => {
+      if (this.orbitDrag && ev.pointerId !== this.orbitDrag.id) return;
+      window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
+      const o = this.orbitDrag; this.orbitDrag = null; document.body.classList.remove("orbiting");
+      if (o && !o.moved) { const now = performance.now(); if (now - (this._tap || 0) < 320) this.resetView(); this._tap = now; }
+    };
+    window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
+  },
+
   /* ── 선택 · 호버 ── */
   pick(x, y) {
-    const slop = this.touch ? 14 : 7; let best = null, bd = 1e9;
+    const slop = this.touch ? 16 : 10; let best = null, bd = 1e9;
     for (const o of this.orbs.values()) { if (o.hidden) continue; const d = Math.hypot(x - o.sx, y - o.sy); if (d < o.sr + slop + 2 && d < bd) { bd = d; best = { kind: "orb", id: o.id }; } }
     for (const s of this.systems.values()) for (const m of s.moons.values()) {
       if (m.hidden || !m.match) continue; const d = Math.hypot(x - m.sx, y - m.sy);
@@ -417,13 +490,32 @@ const Scene = {
     st.addEventListener("pointermove", e => this.onMove(e));
     st.addEventListener("pointerleave", () => { this.systems.forEach(s => { s.hover = false; }); if (!this.drag) this.setHover(null); st.style.cursor = ""; });
     st.addEventListener("pointerdown", e => this.onDown(e));
+    st.addEventListener("wheel", e => { e.preventDefault(); this.zoomBy(Math.exp(e.deltaY * (e.ctrlKey ? 0.01 : 0.0012))); }, { passive: false });
+    st.addEventListener("pointermove", e => {
+      const p = this.ptrs.get(e.pointerId); if (p) { p.x = e.clientX; p.y = e.clientY; }
+      if (this.pinch && this.ptrs.size >= 2) { const [a, b] = [...this.ptrs.values()]; this.v3d.tzoom = U.clamp(this.pinch.z0 * this.pinch.d0 / (Math.hypot(a.x - b.x, a.y - b.y) || 1), 0.45, 1.8); }
+    });
+    const lift = e => { this.ptrs.delete(e.pointerId); if (this.ptrs.size < 2) this.pinch = null; };
+    window.addEventListener("pointerup", lift); window.addEventListener("pointercancel", lift);
+    this.tags.addEventListener("pointerdown", e => {
+      const tag = e.target.closest(".mtag"); if (!tag) return; e.stopPropagation();
+      if (e.target.closest(".mt-go")) return;
+      this.startPending(e, { kind: "moon", id: tag.dataset.id, sysId: tag.dataset.sys });
+    });
+    this.tags.addEventListener("click", e => {
+      const b = e.target.closest(".mt-go"); if (!b) return;
+      const tag = b.closest(".mtag"), r = tag.getBoundingClientRect();
+      this.lastPos.set(tag.dataset.id, { x: r.left + r.width / 2, y: r.top + r.height / 2, t0: this.time }); App.startTask(tag.dataset.id);
+    });
     window.addEventListener("pointermove", e => { this.par.tx = e.clientX / window.innerWidth - 0.5; this.par.ty = e.clientY / window.innerHeight - 0.5; }, { passive: true });
     this.focus.addEventListener("pointerdown", e => { if (e.target.closest(".f-done, .f-more")) return; const card = e.target.closest(".fcard"); if (card) this.startPending(e, { kind: "orb", id: card.dataset.id, sysId: null }); });
     this.focus.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (!b) return; if (b.dataset.act === "done") App.completeTask(b.closest(".fcard").dataset.id); else if (b.dataset.act === "more") App.openToday(); });
     this.focus.addEventListener("keydown", e => { const m = e.target.closest(".f-main"); if (m && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); App.openTask(m.closest(".fcard").dataset.id); } });
   },
   onMove(e) {
-    if (this.drag || e.pointerType !== "mouse") return;
+    if (this.drag || this.orbitDrag || e.pointerType !== "mouse") return;
+    const tag = e.target.closest(".mtag");
+    if (tag) { for (const s of this.systems.values()) s.hover = s.id === tag.dataset.sys; this.hover = { kind: "moon", id: tag.dataset.id, sys: this.systems.get(tag.dataset.sys) }; this.tip.hidden = true; this.stage.style.cursor = "grab"; return; }
     const x = e.clientX, y = e.clientY, ns = this.nearSystem(x, y);
     for (const s of this.systems.values()) s.hover = s === ns;
     if (e.target.closest("button, .fcard, .p-label")) { this.setHover(null); this.stage.style.cursor = ""; return; }
@@ -432,10 +524,15 @@ const Scene = {
   },
   onDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (e.target.closest("button, a, input, .fcard, .p-label")) return;
+    if (e.target.closest("button, a, input, .fcard, .p-label, .mtag")) return;
     const x = e.clientX, y = e.clientY;
+    this.ptrs.set(e.pointerId, { x, y });
+    if (this.ptrs.size >= 2) {
+      if (this.drag) this.endDrag(); this.orbitDrag = null; document.body.classList.remove("orbiting");
+      const [a, b] = [...this.ptrs.values()]; this.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: this.v3d.tzoom }; return;
+    }
     if (e.pointerType !== "mouse") { const ns = this.nearSystem(x, y); this.systems.forEach(s => { s.pinned = s === ns; }); }
-    const hit = this.pick(x, y); if (!hit) return;
+    const hit = this.pick(x, y); if (!hit) { this.startOrbit(e); return; }
     this.startPending(e, { kind: hit.kind, id: hit.id, sysId: hit.sys ? hit.sys.id : null });
   },
   startPending(e, o) {

@@ -33,6 +33,17 @@
   <div id="tooltip" class="tooltip" hidden></div>
 </main>
 
+<div class="focus-chip" id="focusChip" hidden></div>
+<div class="view-ctl" id="viewCtl" role="toolbar" aria-label="시점 조작">
+  <button type="button" class="vc-btn vc-zoom" data-vc="in" aria-label="확대" title="확대  +"><span data-ico="plus"></span></button>
+  <button type="button" class="vc-btn vc-zoom" data-vc="out" aria-label="축소" title="축소  −"><span data-ico="minus"></span></button>
+  <span class="vc-sep" aria-hidden="true"></span>
+  <button type="button" class="vc-btn" data-vc="reset" aria-label="전체 보기" title="전체 보기  0"><span data-ico="fit"></span></button>
+  <button type="button" class="vc-btn" data-vc="spin" id="vcSpin" aria-label="자동 회전" title="자동 회전  R"><span data-ico="pause"></span></button>
+  <button type="button" class="vc-btn" data-vc="help" aria-label="조작 안내" title="조작 안내  ?"><span data-ico="help"></span></button>
+</div>
+<div class="coach" id="coach" hidden role="dialog" aria-label="조작 안내"></div>
+
 <header class="topbar">
   <div class="tb-left">
     <div class="brand" aria-label="ORBIT">

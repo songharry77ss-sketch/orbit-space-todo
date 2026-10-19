@@ -14,6 +14,15 @@ const App = {
     $("#settingsBtn").addEventListener("click", () => Modal.settings());
     $("#progressBtn").addEventListener("click", () => this.openToday());
     $("#modal").addEventListener("click", e => { if (e.target.closest("[data-close]")) Modal.close(); });
+    $("#viewCtl").addEventListener("click", e => {
+      const b = e.target.closest("[data-vc]"); if (!b) return; const a = b.dataset.vc;
+      if (a === "in") Scene.zoomBy(0.82); else if (a === "out") Scene.zoomBy(1.22); else if (a === "reset") Scene.resetView();
+      else if (a === "spin") Scene.setAutoRotate(!Scene.autoRotate); else if (a === "help") this.coach(true);
+    });
+    $("#focusChip").addEventListener("click", e => { if (e.target.closest("[data-act=back]")) Scene.focusOn(null); });
+    $("#coach").addEventListener("click", e => { if (e.target.closest("[data-act]")) this.coach(false); });
+    this.paintSpin();
+    if (!Store.state.settings.coachSeen) setTimeout(() => { if (!Store.state.settings.coachSeen && $("#coach").hidden) this.coach(true); }, 1600);
     document.addEventListener("keydown", e => this.onKey(e));
     Store.on(d => this.onChange(d));
     const hash = location.hash.replace("#", "");
@@ -23,7 +32,7 @@ const App = {
     setInterval(() => this.checkDay(), 30000);
     window.addEventListener("resize", () => this.placeSeg());
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.placeSeg());
-    if (!Store.state.settings.hintSeen) { setTimeout(() => this.toast("sparkle", "위성을 끌어 가운데 태양에 올려 보세요"), 1400); Store.setSetting("hintSeen", true); }
+
   },
   onChange(d) {
     Scene.sync(d);
@@ -59,6 +68,22 @@ const App = {
     btn.classList.toggle("complete", s.total > 0 && s.done === s.total);
     btn.title = s.total ? `오늘 ${s.total}개 중 ${s.done}개 완료` : "오늘의 미션";
   },
+  paintSpin() {
+    const b = $("#vcSpin"); if (!b) return; const on = Scene.autoRotate;
+    b.innerHTML = ico(on ? "pause" : "play", 16); b.setAttribute("aria-pressed", on); b.title = on ? "자동 회전 멈추기  R" : "자동 회전 켜기  R";
+  },
+  /* 첫 실행 조작 안내 (언제든 ? 버튼으로 다시 열기) */
+  coach(show) {
+    const el = $("#coach"); if (!show) { el.hidden = true; Store.setSetting("coachSeen", true); return; }
+    const touch = Scene.touch, rows = touch
+      ? [["한 손가락 드래그", "빈 공간을 끌면 시점이 돌아가요"], ["두 손가락", "오므리거나 벌려서 확대·축소해요"], ["행성 탭", "가까이 다가가 할 일을 보여 줘요"], ["위성 → 태양", "끌어다 놓으면 집중이 시작돼요"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 탭", "전체 보기로 돌아가요"]]
+      : [["드래그", "빈 공간을 끌면 시점이 돌아가요"], ["휠", "확대하고 축소해요"], ["행성 클릭", "가까이 다가가 할 일을 보여 줘요"], ["위성 → 태양", "끌어다 놓으면 집중이 시작돼요"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 클릭", "전체 보기로 돌아가요"]];
+    el.innerHTML = `<div class="coach-h"><span>조작 안내</span><button type="button" class="icon-btn plain sm" data-act="close" aria-label="닫기">${ico("x", 16)}</button></div>
+      <ul class="coach-list">${rows.map(([k, v]) => `<li><span class="ck">${k}</span><span>${v}</span></li>`).join("")}</ul>
+      ${touch ? "" : `<div class="coach-keys"><kbd>N</kbd> 새 할 일 <kbd>/</kbd> 검색 <kbd>0</kbd> 전체 보기 <kbd>R</kbd> 자동 회전</div>`}
+      <div class="coach-foot"><button type="button" class="btn sol sm" data-act="ok">알겠어요</button></div>`;
+    el.hidden = false;
+  },
   checkDay() { if (this.day !== U.today()) { this.day = U.today(); Scene.sync({ type: "day" }); Panel.refresh(); Calendar.render(); this.renderHeader(); QuickAdd.onView(this.view); } },
   onKey(e) {
     const ae = document.activeElement, typing = ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable);
@@ -67,7 +92,9 @@ const App = {
       if (!$("#modal").hidden) return Modal.close();
       if (QuickAdd.closePops()) return;
       if (typing) { ae.blur(); return; }
+      if (!$("#coach").hidden) return this.coach(false);
       if (!$("#sheet").hidden) return Panel.close();
+      if (Scene.focusId) return Scene.focusOn(null);
       return;
     }
     if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); Palette.open(); return; }
@@ -77,12 +104,18 @@ const App = {
     else if (k === "/") { e.preventDefault(); Palette.open(); }
     else if (k === "1") this.setView("today"); else if (k === "2") this.setView("all"); else if (k === "3") this.setView("calendar");
     else if (k === "t" || k === "T" || k === "ㅅ") this.openToday();
+    else if (k === "+" || k === "=") Scene.zoomBy(0.82); else if (k === "-" || k === "_") Scene.zoomBy(1.22);
+    else if (k === "0") Scene.resetView(); else if (k === "r" || k === "R" || k === "ㄱ") Scene.setAutoRotate(!Scene.autoRotate);
+    else if (k === "?") this.coach($("#coach").hidden);
+    else if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); Scene.rotateBy(k === "ArrowLeft" ? 0.22 : -0.22, 0); }
+    else if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); Scene.rotateBy(0, k === "ArrowUp" ? 0.1 : -0.1); }
   },
-  openTask(id) { if (Store.task(id)) Panel.open("task", id); },
-  openPlanet(id) { if (Store.planet(id)) Panel.open("planet", id); },
-  openDay(date) { Panel.open("day", null, date); },
-  openToday() { Panel.open("today"); },
-  openNoDue() { Panel.open("nodue"); },
+  /* 할 일·행성을 열면 카메라가 그 행성으로 다가가고, 목록 화면은 전체 보기로 돌아간다 */
+  openTask(id) { const t = Store.task(id); if (!t) return; Panel.open("task", id); Scene.focusOn(t.status === "doing" ? null : t.planetId); },
+  openPlanet(id) { if (!Store.planet(id)) return; Panel.open("planet", id); Scene.focusOn(id); },
+  openDay(date) { Panel.open("day", null, date); Scene.focusOn(null); },
+  openToday() { Panel.open("today"); Scene.focusOn(null); },
+  openNoDue() { Panel.open("nodue"); Scene.focusOn(null); },
 
   startTask(id) {
     const t = Store.task(id); if (!t || t.status === "doing") return;
@@ -230,12 +263,14 @@ const Modal = {
       <div class="btn-row" style="margin-top:10px"><button type="button" class="btn sm" id="mAdd">${ico("plus", 15)}행성 추가</button></div>
       <h4>화면</h4>
       <label class="toggle-row"><span>위성 옆에 할 일 이름 항상 표시<br><small style="color:var(--ink-3)">끄면 행성에 마우스를 올렸을 때만 보여요</small></span><button type="button" class="switch ${Scene.showNames ? "on" : ""}" id="mNames" role="switch" aria-checked="${Scene.showNames}" aria-label="위성 이름 항상 표시"></button></label>
+      <label class="toggle-row" style="margin-top:12px"><span>우주 자동 회전<br><small style="color:var(--ink-3)">조작하거나 패널을 열면 잠시 멈춰요</small></span><button type="button" class="switch ${Scene.autoRotate ? "on" : ""}" id="mSpin" role="switch" aria-checked="${Scene.autoRotate}" aria-label="우주 자동 회전"></button></label>
+      <div class="btn-row" style="margin-top:12px"><button type="button" class="btn sm" id="mCoach">${ico("help", 15)}조작 안내 보기</button></div>
       <h4>앱으로 쓰기</h4><p class="desc" style="margin:0 0 10px">${how}</p>${App.installPrompt ? `<div class="btn-row"><button type="button" class="btn sol sm" id="mInstall">${ico("install", 15)}앱으로 설치</button></div>` : ""}
       <h4>데이터</h4>
       <div class="btn-row"><button type="button" class="btn sm" id="mExport">${ico("download", 15)}JSON 내보내기</button><button type="button" class="btn sm" id="mCopy">${ico("copy", 15)}복사</button><label class="btn sm" for="mFile">${ico("upload", 15)}가져오기</label><input type="file" id="mFile" accept="application/json,.json" hidden></div>
       <div class="btn-row" style="margin-top:8px"><button type="button" class="btn sm" id="mSample">예시 데이터로 시작</button><button type="button" class="btn sm danger" id="mReset">모두 지우기</button></div>
       <h4>단축키</h4>
-      <div class="keys"><kbd>N</kbd><span>새 할 일</span><kbd>/</kbd><span>검색 (Ctrl+K)</span><kbd>1 2 3</kbd><span>오늘 · 전체 · 캘린더</span><kbd>T</kbd><span>오늘의 미션</span><kbd>Esc</kbd><span>닫기</span></div>
+      <div class="keys"><kbd>N</kbd><span>새 할 일</span><kbd>/</kbd><span>검색 (Ctrl+K)</span><kbd>1 2 3</kbd><span>오늘 · 전체 · 캘린더</span><kbd>T</kbd><span>오늘의 미션</span><kbd>+ −</kbd><span>확대 · 축소</span><kbd>← → ↑ ↓</kbd><span>시점 회전</span><kbd>0</kbd><span>전체 보기</span><kbd>R</kbd><span>자동 회전 켜기·끄기</span><kbd>Esc</kbd><span>닫기</span></div>
       <p class="desc" style="margin:12px 0 0">입력 팁: <b>#행성이름</b>으로 행성을, <b>!</b>로 중요를 지정해요. 「내일」「다음주 금요일」「오후 3시」「12/25」 같은 날짜와 시간도 알아들어요.</p>
       <h4>이미지 출처</h4>
       <p class="credits">행성·태양·은하수 텍스처는 <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>의 자료(CC BY 4.0)예요. NASA 탐사선과 관측 자료를 바탕으로 만든 지도입니다.</p>
@@ -243,6 +278,8 @@ const Modal = {
     const c = this.card, on = (s, f) => { const el = c.querySelector(s); if (el) el.addEventListener("click", f); };
     c.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => this.planet(b.dataset.edit)));
     on("#mAdd", () => this.planet(null)); on("#mClose", () => this.close());
+    on("#mSpin", e => { const b = e.currentTarget, v = !Scene.autoRotate; Scene.setAutoRotate(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
+    on("#mCoach", () => { this.close(); App.coach(true); });
     on("#mNames", e => { const b = e.currentTarget, v = !Scene.showNames; Scene.setNames(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
     on("#mInstall", async () => { const p = App.installPrompt; if (!p) return; p.prompt(); try { await p.userChoice; } catch (e) { /* 무시 */ } App.installPrompt = null; this.close(); });
     on("#mExport", () => { try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([Store.exportJSON()], { type: "application/json" })); a.download = `orbit-todo-${U.today()}.json`; a.click(); App.toast("download", "JSON 파일로 내보냈어요"); } catch (e) { App.toast("alert", "내보내지 못했어요. 복사를 이용해 주세요"); } });

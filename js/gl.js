@@ -142,11 +142,12 @@ const GL = {
   drawBg(o) {
     const gl = this.gl, w = Math.max(2, Math.round(this.W * this.dpr * 0.5)), h = Math.max(2, Math.round(this.H * this.dpr * 0.5));
     const buf = this.skyBuffer(w, h), ok = this.fadeIn(o.sky, 1400);
-    if (o.time - this.skyAt > 0.6 || (ok < 1 && ok > 0) || this.skyOK !== ok) {
-      this.skyAt = o.time; this.skyOK = ok;
+    const rot = o.rot || [0, 0], pr = this.skyRot || [9, 9];
+    if (o.time - this.skyAt > 0.6 || (ok < 1 && ok > 0) || this.skyOK !== ok || Math.abs(rot[0] - pr[0]) > 0.0004 || Math.abs(rot[1] - pr[1]) > 0.0004) {
+      this.skyAt = o.time; this.skyOK = ok; this.skyRot = rot.slice();
       gl.bindFramebuffer(gl.FRAMEBUFFER, buf.fb); gl.viewport(0, 0, w, h); gl.disable(gl.BLEND);
       this.use(this.P.sky);
-      this.set("uSky", this.texId(o.sky)); this.set("uSkyOK", ok); this.set("uTime", o.time); this.set("uExp", o.exp); this.set("uView", [this.W, this.H]);
+      this.set("uSky", this.texId(o.sky)); this.set("uSkyOK", ok); this.set("uTime", o.time); this.set("uExp", o.exp); this.set("uView", [this.W, this.H]); this.set("uRot", rot);
       this.quad(this.W / 2, this.H / 2, 1, this.W / 2, this.H / 2);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, this.cv.width, this.cv.height); gl.enable(gl.BLEND);
     }
@@ -182,13 +183,13 @@ float noise3(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 *
 float fbm3(vec3 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 3; i++) { v += a * noise3(p); p = p * 2.02 + vec3(3.1, 1.7, 4.3); a *= 0.5; } return v; }
 `,
 SKY: `
-uniform sampler2D uSky; uniform float uSkyOK, uTime, uExp; uniform vec2 uView;
+uniform sampler2D uSky; uniform float uSkyOK, uTime, uExp; uniform vec2 uView, uRot;
 void main() {
   vec2 fc = vPx; float m = max(uView.x, uView.y);
   vec2 q = (fc - uView * 0.5) / m;
   float ca = cos(-0.42), sa = sin(-0.42);
   vec2 r = vec2(ca * q.x - sa * q.y, sa * q.x + ca * q.y);
-  vec2 suv = vec2(0.47 + r.x * 0.56 + uTime * 0.00035, 0.5 + r.y * 1.05);
+  vec2 suv = vec2(0.47 + r.x * 0.56 + uTime * 0.00035 + uRot.x, 0.5 + r.y * 1.05 + uRot.y);
   vec3 sky = pow(texture2D(uSky, suv).rgb, vec3(0.92)) * uExp * uSkyOK;
   float n1 = fbm(r * 2.3 + vec2(uTime * 0.004, 0.0));
   float n2 = fbm(r * 3.4 - vec2(0.0, uTime * 0.003) + 4.0);
@@ -214,7 +215,7 @@ vec3 stars(vec2 fc, float cell, float dens, float smin, float smax, float seed, 
 }
 void main() {
   vec2 fc = vPx;
-  vec2 bu = (fc + uOff * 0.12) / uView; bu.y = 1.0 - bu.y;
+  vec2 bu = fc / uView; bu.y = 1.0 - bu.y;
   vec3 col = texture2D(uBuf, clamp(bu, 0.001, 0.999)).rgb;
   col += stars(fc + uOff * 0.2, 9.0, 0.10 * uStars, 0.35, 0.8, 1.0, 0.0) * 0.55;
   col += stars(fc + uOff * 0.5, 19.0, 0.12 * uStars, 0.5, 1.15, 17.0, 0.0) * 0.85;

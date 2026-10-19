@@ -30,6 +30,13 @@ const ICONS = {
   pause: '<path d="M9 6v12M15 6v12"/>',
   orbitBack: '<path d="M4 12a8 8 0 1 0 2.3-5.6"/><path d="M4 4v4.5h4.5"/>',
   dot: '<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>',
+  minus: '<path d="M5 12h14"/>',
+  fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><circle cx="12" cy="12" r="2.5"/>',
+  play: '<path d="M8 5.5v13l10-6.5z"/>',
+  help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.7 9.4a2.4 2.4 0 0 1 4.6 1c0 1.6-2.3 2.1-2.3 3.5M12 17h.01"/>',
+  move: '<path d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/>',
+  zoom: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4M8.5 11h5M11 8.5v5"/>',
+  hand: '<path d="M8 11V5.5a1.5 1.5 0 0 1 3 0V10m0-4.5a1.5 1.5 0 0 1 3 0V10m0-3a1.5 1.5 0 0 1 3 0v6.5c0 4-2.5 7-6.5 7-2.6 0-4.3-1.3-5.6-3.4L4 14c-.6-1 .6-2.2 1.6-1.6L8 14"/>',
 };
 function ico(name, size = 18, extra = "") {
   return `<svg class="ico ${extra}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
