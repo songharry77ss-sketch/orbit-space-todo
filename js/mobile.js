@@ -29,7 +29,7 @@
     if (!this.narrow) return baseLayout.call(this);
     const ids = this.order, n = ids.length; if (!n) { Sky.orbits = []; return; }
     const rx = Math.round(this.W * .31);
-    const top = 64 + 88, bottom = this.H - 126, span = Math.max(120, bottom - top);
+    const top = 64 + 88, bottom = this.H - 156, span = Math.max(120, bottom - top);
     Sky.orbits = [{ cx: this.cx, cy: this.cy, rx, ry: span / 2 }];
     ids.forEach((id, i) => {
       const sys = this.systems.get(id); if (!sys) return;
