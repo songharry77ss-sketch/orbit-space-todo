@@ -63,11 +63,11 @@ const Panel = {
       <div class="title-row">
         <button type="button" class="check ${done ? "on" : ""}" data-act="toggle-done" aria-label="${done ? "완료 취소" : "완료"}">${ico("check", 16)}</button>
         <textarea class="task-title ${done ? "done" : ""}" id="taskTitle" rows="1" data-field="title" aria-label="할 일 제목">${e(t.title)}</textarea>
-        <button type="button" class="star-btn ${t.important ? "on" : ""}" data-act="toggle-imp" aria-label="중요 표시" title="중요">${ico("star", 20)}</button>
       </div>
       ${cta}
       ${burned > 1 || doing ? `<div class="burn ${doing ? "live" : ""}"><span class="hot">${ico("flame", 22)}</span><div><div class="lbl">${doing ? "지금 타오르는 중" : "누적 집중 시간"}</div><div class="val" data-live="${t.id}">${U.fmtClock(burned)}</div></div>${start ? `<div class="side">${start} 시작</div>` : ""}</div>` : ""}
       <div class="props">
+        <div class="prop">${prioSvg(t.priority || 0, 18)}<span class="k">우선순위</span><div class="v"><div class="seg-prio" role="radiogroup" aria-label="우선순위">${PRIO_ORDER.map(p => `<button type="button" class="sp ${(t.priority || 0) === p ? "on" : ""}" data-act="prio" data-v="${p}" role="radio" aria-checked="${(t.priority || 0) === p}" style="--pc:${PRIO[p].color}">${p ? prioSvg(p, 13) : ""}${PRIO[p].ko}</button>`).join("")}</div></div></div>
         <div class="prop">${ico("sun", 18)}<span class="k">오늘 할 일</span><div class="v end"><button type="button" class="switch ${myDay ? "on" : ""}" data-act="toggle-myday" role="switch" aria-checked="${myDay}" aria-label="오늘 할 일에 추가" ${done ? "disabled" : ""}></button></div></div>
         <div class="prop">${ico("calendar", 18)}<span class="k">마감</span><div class="v">
           <div class="date-pair"><input type="date" id="taskDue" data-field="due" value="${t.due || ""}" aria-label="마감일"><input type="time" id="taskTime" data-field="time" value="${t.time || ""}" aria-label="시간"></div>
@@ -99,8 +99,9 @@ const Panel = {
     ].filter(Boolean).join("");
     return `<div class="row ${t.status} ${this.mode === "task" && this.id === t.id ? "active" : ""}" data-task="${t.id}" tabindex="0">
       <button type="button" class="check ${t.status === "done" ? "on" : ""}" data-act="row-check" aria-label="${t.status === "done" ? "완료 취소" : "완료"}">${ico("check", 13)}</button>
+      ${t.status !== "done" && !doing ? `<button type="button" class="prio-btn" data-act="row-prio" aria-label="우선순위: ${PRIO[t.priority || 0].ko}" title="우선순위: ${PRIO[t.priority || 0].ko}">${prioSvg(t.priority || 0, 14)}</button>` : ""}
       <div class="body"><div class="t">${U.esc(t.title)}</div>${meta ? `<div class="m">${meta}</div>` : ""}</div>
-      ${t.important ? `<span class="star">${ico("star", 15)}</span>` : ""}${extra}
+${extra}
       ${t.status !== "done" ? `<button type="button" class="act" data-act="row-fire" title="${doing ? "궤도로 되돌리기" : "태양에 올리기"}" aria-label="${doing ? "궤도로 되돌리기" : "태양에 올리기"}">${ico(doing ? "orbitBack" : "flame", 16)}</button>` : ""}
     </div>`;
   },
@@ -152,7 +153,7 @@ const Panel = {
     const doing = list.filter(t => t.status === "doing"), done = list.filter(t => t.status === "done");
     const late = list.filter(t => t.status === "todo" && Store.isOverdue(t)), todo = list.filter(t => t.status === "todo" && !Store.isOverdue(t));
     const remain = doing.length + late.length + todo.length, in3 = U.addDays(today, 3);
-    const suggest = Store.tasks().filter(t => t.status === "todo" && !Store.isTodayTask(t) && ((t.due && t.due <= in3) || (t.important && !t.due))).sort(Store.sortTasks).slice(0, 5);
+    const suggest = Store.tasks().filter(t => t.status === "todo" && !Store.isTodayTask(t) && ((t.due && t.due <= in3) || (t.priority === 1 && !t.due))).sort(Store.sortTasks).slice(0, 5);
     const add = `<button type="button" class="add-today" data-act="suggest-add">+ 오늘</button>`;
     this.inner.innerHTML = this.head(`<div><h3 class="sh-title">오늘의 미션</h3><div class="sh-sub">${U.fmtLong(today)}</div></div>`) + `
     <div class="sh-body">
@@ -162,6 +163,7 @@ const Panel = {
         <div class="stat fire"><div class="v" id="todayBurn">${U.fmtDuration(Store.burnedToday())}</div><div class="l">오늘 집중</div></div>
       </div>
       ${this.miniAdd(`data-myday="1"`, "오늘 할 일 추가")}
+      ${(() => { const n = list.filter(x => x.status === "todo" && !x.priority).length; return n ? `<button type="button" class="b-triage in-sheet" data-act="triage">${prioSvg(0, 14)}<span>우선순위 미정 <b class="num">${n}</b>개</span><span class="go">정리하기${ico("arrowRight", 14)}</span></button>` : ""; })()}
       ${this.section("집중 중", doing, "fire", true, "flame")}
       ${this.section("지난 할 일", late, "late", true, "alert")}
       ${this.section("오늘", todo, "", true, "sun")}
@@ -185,7 +187,9 @@ const Panel = {
       case "close": this.close(); break;
       case "pick-planet": this.planetPicker(btn); break;
       case "toggle-done": case "row-check": if (!t) break; if (t.status === "done") Store.uncompleteTask(t.id); else App.completeTask(t.id); break;
-      case "toggle-imp": if (t) Store.updateTask(tid, { important: !t.important }); break;
+      case "prio": if (t) Store.updateTask(tid, { priority: +btn.dataset.v }); break;
+      case "row-prio": if (t) PrioMenu.open(btn, t.priority || 0, v => Store.updateTask(t.id, { priority: v })); break;
+      case "triage": Modal.triage(Store.todayTasks().filter(x => x.status === "todo" && !x.priority).map(x => x.id)); break;
       case "start": App.startTask(tid); break;
       case "stop": Store.stopTask(tid); App.toast("orbitBack", "궤도로 돌아왔어요 · 타이머 일시정지"); break;
       case "row-fire": if (!t) break; if (t.status === "doing") { Store.stopTask(t.id); App.toast("orbitBack", "궤도로 돌아왔어요"); } else App.startTask(t.id); break;
@@ -231,7 +235,7 @@ const Panel = {
     if (e.key === "Enter" && el.id === "miniAdd" && !e.isComposing) {
       e.preventDefault();
       const q = U.parseQuick(el.value, Store.planets()); if (!q.title) return;
-      const data = { title: q.title, important: q.important, time: q.time, due: q.due };
+      const data = { title: q.title, priority: q.priority, time: q.time, due: q.due };
       data.planetId = q.planetId || el.dataset.planet || QuickAdd.planetId;
       if (el.dataset.due && !q.due) data.due = el.dataset.due;
       if (el.dataset.myday) data.myDay = U.today();

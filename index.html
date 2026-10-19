@@ -33,6 +33,7 @@
   <div id="tooltip" class="tooltip" hidden></div>
 </main>
 
+<aside id="board" class="board" aria-label="할 일 보드"></aside>
 <div class="focus-chip" id="focusChip" hidden></div>
 <div class="view-ctl" id="viewCtl" role="toolbar" aria-label="시점 조작">
   <button type="button" class="vc-btn vc-zoom" data-vc="in" aria-label="확대" title="확대  +"><span data-ico="plus"></span></button>
@@ -86,10 +87,12 @@
 <form id="cmd" class="cmd" autocomplete="off">
   <button type="button" class="cmd-planet" id="cmdPlanet" aria-label="행성 선택"></button>
   <input id="cmdInput" type="text" enterkeyhint="send" placeholder="새 할 일" aria-label="새 할 일">
+  <button type="button" class="cmd-chip prio" id="cmdPrio" aria-label="우선순위"></button>
   <button type="button" class="cmd-chip" id="cmdDate" aria-label="마감일"><span data-ico="calendar"></span><span class="txt">오늘</span></button>
   <button type="submit" class="cmd-go" aria-label="추가"><span data-ico="plus"></span></button>
   <div class="pop" id="popPlanet" hidden></div>
   <div class="pop" id="popDate" hidden></div>
+  <div class="pop" id="popPrio" hidden></div>
 </form>
 
 <aside id="sheet" class="sheet" hidden aria-label="상세 패널">
@@ -124,6 +127,7 @@
 <script src="js/scene.js"></script>
 <script src="js/panel.js"></script>
 <script src="js/calendar.js"></script>
+<script src="js/board.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

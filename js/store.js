@@ -18,6 +18,7 @@ const Store = {
     // 행성 → 실제 천체 매핑 (이전 버전 데이터 이전)
     const used = new Set(this.state.planets.filter(p => BODIES[p.body]).map(p => p.body));
     this.planets().forEach(p => { if (!BODIES[p.body]) { p.body = BODY_ORDER.find(k => !used.has(k)) || "earth"; used.add(p.body); } delete p.emoji; delete p.look; delete p.color; });
+    this.state.tasks.forEach(t => { if (t.priority == null) t.priority = t.important ? 1 : 0; delete t.important; });
     const cutoff = Date.now() - 60 * 86400000;
     this.state.tasks = this.state.tasks.filter(t => !(t.status === "done" && t.completedAt && t.completedAt < cutoff));
   },
@@ -35,7 +36,7 @@ const Store = {
   sortTasks(a, b) {
     const st = { doing: 0, todo: 1, done: 2 };
     if (st[a.status] !== st[b.status]) return st[a.status] - st[b.status];
-    if (a.important !== b.important) return a.important ? -1 : 1;
+    const pa = a.priority || 4, pb = b.priority || 4; if (pa !== pb) return pa - pb;
     if ((a.due || "9") !== (b.due || "9")) return (a.due || "9") < (b.due || "9") ? -1 : 1;
     return a.createdAt - b.createdAt;
   },
@@ -90,7 +91,7 @@ const Store = {
   /* ── 할 일 ── */
   addTask(data) {
     const t = Object.assign({
-      id: U.uid(), title: "", notes: "", planetId: this.planets()[0]?.id, due: null, time: null, important: false,
+      id: U.uid(), title: "", notes: "", planetId: this.planets()[0]?.id, due: null, time: null, priority: 0,
       myDay: null, status: "todo", startedAt: null, burnSeconds: 0, completedAt: null, steps: [], repeat: "none", createdAt: Date.now(),
     }, data);
     if (!t.title.trim()) return null;
@@ -132,7 +133,7 @@ const Store = {
       else if (t.repeat === "monthly") next = U.addMonths(base, 1);
       else if (t.repeat === "weekdays") { next = U.addDays(base, 1); while ([0, 6].includes(U.parseDate(next).getDay())) next = U.addDays(next, 1); }
       spawned = {
-        id: U.uid(), title: t.title, notes: t.notes, planetId: t.planetId, due: next, time: t.time, important: t.important,
+        id: U.uid(), title: t.title, notes: t.notes, planetId: t.planetId, due: next, time: t.time, priority: t.priority || 0,
         myDay: null, status: "todo", startedAt: null, burnSeconds: 0, completedAt: null, steps: t.steps.map(s => ({ id: U.uid(), title: s.title, done: false })),
         repeat: t.repeat, createdAt: Date.now(), parentId: t.id,
       };
@@ -175,25 +176,25 @@ Store.seed = function () {
   const hobby = P("취미", "saturn", 4);
   let i = 0;
   const K = (planet, title, o = {}) => Object.assign({
-    id: U.uid(), title, notes: "", planetId: planet.id, due: null, time: null, important: false, myDay: null,
+    id: U.uid(), title, notes: "", planetId: planet.id, due: null, time: null, priority: 0, myDay: null,
     status: "todo", startedAt: null, burnSeconds: 0, completedAt: null, steps: [], repeat: "none", createdAt: now - (200 - i++) * 60000,
   }, o);
   const steps = (...names) => names.map(n => ({ id: U.uid(), title: n, done: false }));
   const tasks = [
-    K(work, "주간 보고서 작성", { due: T, important: true, steps: steps("데이터 정리", "초안 작성", "검토 요청"), notes: "지난주 지표 비교표 포함할 것" }),
-    K(work, "클라이언트 미팅 준비", { due: T, time: "14:00" }),
-    K(work, "이메일 답장 정리", { due: d(-1) }),
-    K(work, "디자인 리뷰 피드백", { due: d(1) }),
+    K(work, "주간 보고서 작성", { due: T, priority: 1, steps: steps("데이터 정리", "초안 작성", "검토 요청"), notes: "지난주 지표 비교표 포함할 것" }),
+    K(work, "클라이언트 미팅 준비", { due: T, time: "14:00", priority: 2 }),
+    K(work, "이메일 답장 정리", { due: d(-1), priority: 2 }),
+    K(work, "디자인 리뷰 피드백", { due: d(1), priority: 3 }),
     K(work, "분기 OKR 정리", { due: d(3) }),
-    K(study, "알고리즘 문제 3개 풀기", { due: T, status: "doing", startedAt: now - 12 * 60000, myDay: T, burnSeconds: 0 }),
-    K(study, "영어 단어 30개 암기", { due: T, repeat: "daily" }),
+    K(study, "알고리즘 문제 3개 풀기", { due: T, priority: 2, status: "doing", startedAt: now - 12 * 60000, myDay: T, burnSeconds: 0 }),
+    K(study, "영어 단어 30개 암기", { due: T, repeat: "daily", priority: 3 }),
     K(study, "React 강의 2강 수강", { due: d(2) }),
-    K(fit, "러닝 5km", { myDay: T, important: true }),
+    K(fit, "러닝 5km", { myDay: T, priority: 2 }),
     K(fit, "아침 스트레칭", { due: T, repeat: "daily", status: "done", completedAt: now - 60 * 60000, burnSeconds: 420 }),
     K(fit, "헬스 PT 예약", { due: d(5) }),
-    K(life, "장보기", { due: T, steps: steps("우유", "계란", "채소"), notes: "두부도 떨어짐" }),
-    K(life, "공과금 납부", { due: d(-2), important: true }),
-    K(life, "방 청소", { due: d(1) }),
+    K(life, "장보기", { due: T, priority: 2, steps: steps("우유", "계란", "채소"), notes: "두부도 떨어짐" }),
+    K(life, "공과금 납부", { due: d(-2), priority: 1 }),
+    K(life, "방 청소", { due: d(1), priority: 3 }),
     K(life, "치과 예약 전화"),
     K(hobby, "기타 연습 30분", { myDay: T }),
     K(hobby, "사진 정리"),

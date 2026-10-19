@@ -47,7 +47,7 @@ const Calendar = {
       const shown = list.slice(0, max);
       html += `<div class="${cls}" data-date="${ds}" role="button" tabindex="-1" aria-label="${U.fmtDate(ds)} 할 일 ${list.length}개">
         <div class="cal-day"><span class="d">${d.getDate()}</span>${list.length ? `<span class="cnt ${dn === list.length ? "alldone" : ""}">${dn}/${list.length}</span>` : ""}</div>
-        ${shown.map(t => { const p = Store.planet(t.planetId); return `<div class="cal-task ${t.status}" draggable="true" data-id="${t.id}" style="--c:${p ? pColor(p) : "#fff"}" title="${U.esc(t.title)}"><span class="t">${U.esc(t.title)}</span></div>`; }).join("")}
+        ${shown.map(t => { const p = Store.planet(t.planetId); return `<div class="cal-task ${t.status} ${t.priority === 1 ? "p1" : ""}" draggable="true" data-id="${t.id}" style="--c:${p ? pColor(p) : "#fff"}" title="${U.esc(t.title)}">${t.priority === 1 ? prioSvg(1, 10) : ""}<span class="t">${U.esc(t.title)}</span></div>`; }).join("")}
         ${list.length > max ? `<div class="cal-more">+${list.length - max}</div>` : ""}
       </div>`;
     }

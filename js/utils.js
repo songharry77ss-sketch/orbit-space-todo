@@ -61,13 +61,14 @@ const U = {
   /* 빠른 추가 파서: "#행성 !중요 내일 오후 3시 보고서 작성" */
   parseQuick(text, planets) {
     let t = " " + text + " ";
-    const out = { title: "", planetId: null, important: false, due: null, time: null };
+    const out = { title: "", planetId: null, priority: 0, due: null, time: null };
     t = t.replace(/\s#(\S+)/g, (m, name) => {
       const p = planets.find(p => p.name === name) || planets.find(p => p.name.startsWith(name));
       if (p) { out.planetId = p.id; return " "; }
       return m;
     });
-    if (/\s!+(?=\s)/.test(t)) { out.important = true; t = t.replace(/\s!+(?=\s)/g, " "); }
+    /* 우선순위: !1 !2 !3 또는 !높음 !보통 !낮음, !만 쓰면 높음 */
+    t = t.replace(/\s!(1|2|3|높음|보통|낮음)?(?=\s)/, (m, v) => { out.priority = !v ? 1 : ({ 1: 1, 2: 2, 3: 3, "높음": 1, "보통": 2, "낮음": 3 })[v]; return " "; });
     const today = U.today();
     const dateRules = [
       [/\s오늘(?=\s)/, () => today],

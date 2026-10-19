@@ -52,14 +52,15 @@ const Scene = {
     FX.resize(this.W, this.H);
     document.body.classList.toggle("narrow", this.narrow); document.body.classList.toggle("touch", this.touch);
     this.layout();
+    if (this._narrow !== this.narrow) { this._narrow = this.narrow; if (this.order.length) this.sync({}); }
   },
   orbitR(i) { return this.narrow ? 6.6 + i * 2.05 : 9 + i * 2.7; },
   shellR(s, i) { return s.R * (this.narrow ? 1.55 : 1.7) + 0.25 + i * (this.narrow ? 0.62 : 0.62); },
-  moonR(t) { return (t.important ? 0.3 : 0.25) * (this.narrow ? 1.45 : 1) * (this.touch ? 1.1 : 1); },
+  moonR(t) { return ([0.24, 0.32, 0.27, 0.22][t.priority || 0]) * (this.narrow ? 1.45 : 1) * (this.touch ? 1.1 : 1); },
   layout() {
     const burning = this.orbs.size > 0, n = this.order.length;
     const top = this.narrow ? 124 : 92, bottom = this.H - (this.narrow ? (burning ? 160 : 84) : (burning ? 108 : 100));
-    const left = this.narrow ? 6 : 28, right = this.W - (this.narrow ? 6 : 28) - (this.panelOpen && !this.narrow ? this.panelW() : 0);
+    const left = this.narrow ? 6 : 28 + (this.boardW || 0), right = this.W - (this.narrow ? 6 : 28) - (this.panelOpen && !this.narrow ? this.panelW() : 0);
     this.area = { top, bottom, left, right };
     this.order.forEach((id, i) => { const s = this.systems.get(id); if (!s) return; s.orbit = this.orbitR(i); s.ang0 = Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2 + i * 0.35; s.R = (this.narrow ? 1.5 : 1.02) * s.body.size; });
     const asp = (right - left) / Math.max(1, bottom - top);
@@ -91,6 +92,7 @@ const Scene = {
     this.cam.tDist = hi; this.cam.tsx = rcx - (e.x0 + e.x1) / 2; this.cam.tsy = rcy - (e.y0 + e.y1) / 2;
   },
   setPanel(open) { this.panelOpen = open; this.layout(); },
+  setBoard(w) { if (this.boardW === w) return; this.boardW = w; this.layout(); },
   project(p) { const c = M4.xf(this.cam.VP, p[0], p[1], p[2]), w = c[3] || 1e-6; return { x: (c[0] / w * 0.5 + 0.5) * this.W, y: (0.5 - c[1] / w * 0.5) * this.H, w }; },
   unproject(x, y, depth) {
     const inv = this.cam.inv || (this.cam.inv = M4.inv(this.cam.VP)); if (!inv) return [0, 0, 0];
@@ -128,9 +130,9 @@ const Scene = {
       const list = [...s.moons.values()].sort((a, b) => a.task.createdAt - b.task.createdAt);
       list.forEach((m, i) => { m.shell = this.shellOf(i); m.speed = (Math.PI * 2) / (30 + m.shell * 12) * (m.shell % 2 ? -1 : 1); });
       s.shells = list.length ? this.shellOf(list.length - 1) + 1 : 0;
-      const fire = doing.filter(t => t.planetId === s.id).length, late = list.filter(m => Store.isOverdue(m.task)).length;
-      s.metaEl.innerHTML = `<span>할 일 ${list.length}</span>${fire ? `<span class="m-fire">집중 ${fire}</span>` : ""}${late ? `<span class="m-late">지남 ${late}</span>` : ""}`;
-      s.label.classList.toggle("empty", !list.length && !fire);
+      const fire = doing.filter(t => t.planetId === s.id).length, late = list.filter(m => Store.isOverdue(m.task)).length, high = list.filter(m => m.task.priority === 1).length;
+      s.metaEl.innerHTML = `<span>할 일 ${list.length}</span>${high ? `<span class="m-high">높음 ${high}</span>` : ""}${fire ? `<span class="m-fire">집중 ${fire}</span>` : ""}${late ? `<span class="m-late">지남 ${late}</span>` : ""}`;
+      s.label.classList.toggle("empty", !list.length && !fire); s.lm = 0;
       s.label.setAttribute("aria-label", `${s.planet.name} 행성, 할 일 ${list.length}개. 열기`);
     }
     const dset = new Set(doing.map(t => t.id));
@@ -172,7 +174,7 @@ const Scene = {
   },
   renderFocus(doing) {
     const max = this.narrow ? 8 : 4, shown = doing.slice(0, max);
-    this.focus.hidden = !doing.length; document.body.classList.toggle("has-focus", doing.length > 0);
+    this.focus.hidden = !doing.length || !this.narrow; document.body.classList.toggle("has-focus", doing.length > 0 && this.narrow);
     this.focus.innerHTML = (this.narrow ? "" : `<div class="f-head"><span class="f-dot"></span>집중 중<span class="n">${doing.length}</span></div>`) + shown.map(t => {
       const p = Store.planet(t.planetId);
       return `<div class="fcard" data-id="${t.id}" style="--c:${p ? pColor(p) : "#fff"}">
@@ -320,9 +322,10 @@ const Scene = {
       if (s.body.atmK) { const dx = sun.sx - s.sx, dy = sun.sy - s.sy, l = Math.hypot(dx, dy) || 1; G3.drawGlow({ pos: s.p, size: s.Rd * 1.4, mode: 1, scale: 1.4, color: s.body.atm, k: s.body.atmK, ld: [dx / l, -dy / l] }); }
       for (const m of s.moons.values()) {
         if (d && d.id === m.id) continue;
-        const hov = (this.hover && this.hover.id === m.id) || (Panel.mode === "task" && Panel.id === m.id), late = Store.isOverdue(m.task);
-        if (!hov && !late && !m.task.important) continue;
-        const c = hov ? [1, 1, 1] : late ? [1, 0.36, 0.42] : [1, 0.78, 0.4], kk = hov ? 1 : late ? 0.7 + 0.3 * Math.sin(t * 3.5) : 0.85;
+        const hov = (this.hover && this.hover.id === m.id) || this.listHover === m.id || (Panel.mode === "task" && Panel.id === m.id), late = Store.isOverdue(m.task), pr = m.task.priority || 0;
+        if (!hov && !late && !pr) continue;
+        const pc = pr ? hexRGB(PRIO[pr].color) : [1, 0.36, 0.42], pulse = late ? 0.65 + 0.35 * Math.sin(t * 3.5) : 1;
+        const c = hov ? [1, 1, 1] : pc, kk = hov ? 1 : (pr === 3 ? 0.5 : pr === 2 ? 0.75 : 0.95) * pulse;
         G3.drawGlow({ pos: m.p, size: this.moonR(m.task) * 2.1, mode: 2, scale: 2.1, color: c, k: kk });
       }
     }
@@ -346,11 +349,12 @@ const Scene = {
     const W = this.W, near = Math.min(...[...this.systems.values()].map(s => s.w)), far = Math.max(...[...this.systems.values()].map(s => s.w));
     for (const s of this.systems.values()) {
       const flip = s.sx > W - 210 && s.sx > W / 2, k = 0.72, ax = s.sx + (flip ? -1 : 1) * s.sr * k, ay = s.sy - s.sr * k;
-      s.label.classList.toggle("flip", flip); s.label.classList.toggle("hot", s.h > 0.5); s.label.classList.toggle("hid", s.hidden || (s.id === this.focusId && this.fe > 0.5));
+      s.label.classList.toggle("flip", flip); s.label.classList.toggle("hot", s.h > 0.5 || (this.listHover && s.moons.has(this.listHover))); s.label.classList.toggle("hid", s.hidden || (s.id === this.focusId && this.fe > 0.5));
       s.label.style.transform = `translate3d(${ax.toFixed(1)}px, ${ay.toFixed(1)}px, 0)`;
       const depth = far > near ? (s.w - near) / (far - near) : 0, other = this.focusId && s.id !== this.focusId;
       s.label.style.setProperty("--dim", (other ? 0.32 : 1 - depth * 0.35).toFixed(2));
     }
+    this.cullLabels();
     this.placeTags();
     const sun = this.sun;
     this.hint.style.transform = `translate3d(${sun.sx.toFixed(1)}px, ${(sun.sy + sun.sr * 1.55 + 14).toFixed(1)}px, 0) translateX(-50%)`;
@@ -364,12 +368,28 @@ const Scene = {
       this.focus.querySelectorAll("[data-live]").forEach(el => { const t = Store.task(el.dataset.live); if (t) el.textContent = U.fmtClock(Store.burned(t)); });
     }
   },
+  /* 라벨이 겹치면 가까운 행성·강조된 행성을 먼저 살리고, 나머지는 이름만 남기거나 숨긴다 */
+  cullLabels() {
+    const placed = [], hit = (a, b) => a[0] < b[2] + 4 && a[2] + 4 > b[0] && a[1] < b[3] + 2 && a[3] + 2 > b[1];
+    const list = [...this.systems.values()].sort((a, b) => ((b.h > 0.5) - (a.h > 0.5)) || ((b.id === this.focusId) - (a.id === this.focusId)) || (a.w - b.w));
+    for (const s of list) {
+      if (!s.lm) { const box = s.label.querySelector(".pl-box"); s.lw = box.offsetWidth; s.lh = box.offsetHeight; s.cw = s.nameEl.offsetWidth + 8; s.lm = 1; }
+      const off = s.label.classList.contains("hid");
+      if (off) { s.label.classList.remove("compact", "cull"); continue; }
+      const flip = s.label.classList.contains("flip"), k = 0.72, ax = s.sx + (flip ? -1 : 1) * s.sr * k, ay = s.sy - s.sr * k;
+      const rect = (w, h) => flip ? [ax - 14 - w, ay - 14 - h, ax - 14, ay - 14] : [ax + 14, ay - 14 - h, ax + 14 + w, ay - 14];
+      const full = rect(s.lw, s.lh), comp = rect(s.cw, 18);
+      let mode = 0; if (placed.some(r => hit(r, full))) mode = placed.some(r => hit(r, comp)) ? 2 : 1;
+      if (mode < 2) placed.push(mode ? comp : full);
+      s.label.classList.toggle("compact", mode === 1); s.label.classList.toggle("cull", mode === 2);
+    }
+  },
   /* 위성 옆 할 일 이름: 행성에 올렸을 때(또는 설정에서 항상) 보여 준다 */
   placeTags() {
     const pool = this.tagPool || (this.tagPool = []), items = [], dragging = this.drag && !this.drag.pending;
     if (this.view !== "calendar" && !dragging) for (const s of this.systems.values()) {
-      const live = s.h > 0.55; if (!(this.showNames || live)) continue;
-      for (const m of s.moons.values()) if (!m.hidden && m.match && m.sr > 1.5) {
+      const live = s.h > 0.55; if (!(this.showNames || live || (this.listHover && s.moons.has(this.listHover)))) continue;
+      for (const m of s.moons.values()) if (!m.hidden && m.match && m.sr > 1.5 && (live || this.showNames || m.id === this.listHover)) {
         const w = (this.tagW && this.tagW.get(m.id)) || 140; let left = m.sx < s.sx;
         if (left && m.sx - m.sr - 8 - w < 6) left = false; else if (!left && m.sx + m.sr + 8 + w > this.W - 6) left = true;
         items.push({ m, s, left, live, x: left ? m.sx - m.sr - 8 : m.sx + m.sr + 8, y: m.sy, a: live ? 1 : 0.72 });
@@ -387,8 +407,8 @@ const Scene = {
       el.hidden = false; const tk = it.m.task, txt = tk.title;
       if (el._t !== txt || el._live !== it.live) { el._t = txt; el._live = it.live; el._tt.textContent = txt.length > 20 ? txt.slice(0, 19) + "…" : txt; el._w = 0; }
       if (el.dataset.id !== it.m.id) { el.dataset.id = it.m.id; el.dataset.sys = it.s.id; el._w = 0; }
-      el.classList.toggle("late", Store.isOverdue(tk)); el.classList.toggle("imp", !!tk.important); el.classList.toggle("live", it.live); el.classList.toggle("left", it.left);
-      el.classList.toggle("sel", !!((this.hover && this.hover.id === it.m.id) || (Panel.mode === "task" && Panel.id === it.m.id)));
+      el.classList.toggle("late", Store.isOverdue(tk)); el.classList.toggle("p1", tk.priority === 1); el.classList.toggle("p2", tk.priority === 2); el.classList.toggle("p3", tk.priority === 3); el.classList.toggle("live", it.live); el.classList.toggle("left", it.left);
+      el.classList.toggle("sel", !!((this.hover && this.hover.id === it.m.id) || this.listHover === it.m.id || (Panel.mode === "task" && Panel.id === it.m.id)));
       el.style.opacity = it.a; el.style.transform = `translate3d(${it.x.toFixed(1)}px, ${it.y.toFixed(1)}px, 0) translate(${it.left ? -100 : 0}%, -50%)`;
     });
     /* 폭은 글자가 바뀔 때만 다시 잰다 */
@@ -476,7 +496,7 @@ const Scene = {
     if (t.status === "doing") meta.push(`<span class="hot">${ico("flame", 12)}${U.fmtDuration(Store.burned(t))} 집중 중</span>`);
     if (t.due) meta.push(`<span class="${late ? "late" : ""}">${ico(late ? "alert" : "calendar", 12)}${U.relDate(t.due)}${t.time ? " " + U.fmtTime(t.time) : ""}</span>`);
     else if (t.time) meta.push(`<span>${ico("clock", 12)}${U.fmtTime(t.time)}</span>`);
-    if (t.important) meta.push(`<span class="imp">${ico("star", 12)}중요</span>`);
+    if (t.priority) meta.push(`<span style="color:${PRIO[t.priority].color}">${prioSvg(t.priority, 12)}${PRIO[t.priority].ko}</span>`);
     if (t.steps.length) meta.push(`<span>${ico("list", 12)}${t.steps.filter(s => s.done).length}/${t.steps.length}</span>`);
     if (t.repeat && t.repeat !== "none") meta.push(`<span>${ico("repeat", 12)}반복</span>`);
     this.tip.innerHTML = `<div class="tt-top"><i style="--c:${p ? pColor(p) : "#fff"}"></i>${U.esc(p ? p.name : "")}</div><div class="tt-title">${U.esc(t.title)}</div>${meta.length ? `<div class="tt-meta">${meta.join("")}</div>` : ""}<div class="tt-hint">${h.kind === "orb" ? "클릭: 열기 · 행성으로 드래그: 궤도 복귀" : "클릭: 열기 · 태양으로 드래그: 집중 시작"}</div>`;
