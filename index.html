@@ -27,6 +27,7 @@
   <canvas id="gl" aria-hidden="true"></canvas>
   <canvas id="fx" aria-hidden="true"></canvas>
   <div id="labels" class="labels"></div>
+  <div id="mtags" class="mtags" aria-hidden="true"></div>
   <div id="sunHint" class="sun-hint" hidden></div>
   <div id="focus" class="focus" hidden aria-label="집중 중인 할 일"></div>
   <div id="tooltip" class="tooltip" hidden></div>
@@ -34,20 +35,23 @@
 
 <header class="topbar">
   <div class="tb-left">
-    <div class="brand"><span class="brand-dot" aria-hidden="true"></span>ORBIT</div>
-    <h1 class="today-date" id="todayDate">오늘</h1>
-    <p class="today-sub" id="todaySub"></p>
+    <div class="brand" aria-label="ORBIT">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="3.6" fill="#f4a259"/><ellipse cx="11" cy="11" rx="9.4" ry="4" transform="rotate(-24 11 11)" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="1.2"/><circle cx="19.2" cy="7.6" r="1.5" fill="currentColor"/></svg>
+      <span>Orbit</span>
+    </div>
+    <span class="tb-div" aria-hidden="true"></span>
+    <div class="today"><div class="today-date" id="todayDate">오늘</div><div class="today-sub" id="todaySub"></div></div>
   </div>
   <nav class="seg" id="seg" role="tablist" aria-label="보기 전환">
+    <button type="button" class="seg-btn" data-view="today" role="tab">오늘</button>
+    <button type="button" class="seg-btn" data-view="all" role="tab">전체</button>
+    <button type="button" class="seg-btn" data-view="calendar" role="tab">캘린더</button>
     <span class="seg-thumb" aria-hidden="true"></span>
-    <button type="button" class="seg-btn" data-view="today" role="tab"><span data-ico="sun"></span>오늘</button>
-    <button type="button" class="seg-btn" data-view="all" role="tab"><span data-ico="orbit"></span>전체</button>
-    <button type="button" class="seg-btn" data-view="calendar" role="tab"><span data-ico="calendar"></span>캘린더</button>
   </nav>
   <div class="tb-right">
-    <button type="button" class="icon-btn" id="searchBtn" aria-label="할 일 검색" title="검색  /"><span data-ico="search"></span></button>
+    <button type="button" class="search-btn" id="searchBtn" aria-label="할 일 검색"><span data-ico="search"></span><span class="lbl">검색</span><kbd>/</kbd></button>
     <button type="button" class="ring-btn" id="progressBtn" aria-label="오늘의 미션 열기">
-      <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><circle class="ring-bg" cx="20" cy="20" r="16.5"></circle><circle class="ring-fg" id="progressRing" cx="20" cy="20" r="16.5"></circle></svg>
+      <svg viewBox="0 0 40 40" width="22" height="22" aria-hidden="true"><circle class="ring-bg" cx="20" cy="20" r="16.5"></circle><circle class="ring-fg" id="progressRing" cx="20" cy="20" r="16.5"></circle></svg>
       <span class="ring-num" id="progressText">0</span>
     </button>
     <button type="button" class="icon-btn" id="settingsBtn" aria-label="행성 관리와 설정" title="설정"><span data-ico="sliders"></span></button>
@@ -104,6 +108,7 @@
 <script src="js/icons.js"></script>
 <script src="js/store.js"></script>
 <script src="js/gl.js"></script>
+<script src="js/gl3d.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/scene.js"></script>
 <script src="js/panel.js"></script>

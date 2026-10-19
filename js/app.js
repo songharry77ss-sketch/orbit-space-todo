@@ -42,13 +42,15 @@ const App = {
   },
   placeSeg() {
     const b = document.querySelector(`.seg-btn[aria-selected="true"]`), th = $(".seg-thumb"); if (!b || !th) return;
-    th.style.width = `${b.offsetWidth}px`; th.style.transform = `translateX(${b.offsetLeft}px)`;
+    const pad = window.innerWidth < 640 ? Math.max(0, (b.offsetWidth - 44) / 2) : 14;
+    th.style.width = `${b.offsetWidth - pad * 2}px`; th.style.transform = `translateX(${b.offsetLeft + pad}px)`;
   },
   renderHeader() {
+    if (!$("#todayDate")) return;
     const today = U.today(), d = U.parseDate(today);
     const date = `${d.getMonth() + 1}월 ${d.getDate()}일 ${U.weekday(today)}요일`;
     const s = Store.todayStats(), remain = s.total - s.done, burn = Store.burnedToday();
-    const sub = `<span>남은 할 일 <b>${remain}</b></span><span>완료 <b>${s.done}</b></span>${burn >= 60 || s.doing ? `<span class="s-fire">집중 <b>${U.fmtDuration(burn)}</b></span>` : ""}${s.overdue ? `<span>지남 <b class="late">${s.overdue}</b></span>` : ""}`;
+    const sub = `<span>남은 일 <b>${remain}</b></span><span>완료 <b>${s.done}</b></span>${burn >= 60 || s.doing ? `<span class="s-fire">집중 <b>${U.fmtDuration(burn)}</b></span>` : ""}${s.overdue ? `<span class="s-late">기한 지남 <b>${s.overdue}</b></span>` : ""}`;
     const dEl = $("#todayDate"); if (dEl.textContent !== date) dEl.textContent = date;
     if (sub !== this._sub) { $("#todaySub").innerHTML = sub; this._sub = sub; }
     const pct = s.total ? s.done / s.total : 0, ring = $("#progressRing"), btn = $("#progressBtn");
@@ -226,6 +228,8 @@ const Modal = {
       <h4>행성</h4>
       <div class="plist">${ps.map(p => `<div class="pitem">${thumbImg(bodyKey(p), 38)}<div class="nm">${U.esc(p.name)}<small>${bodyOf(p).ko} · 남은 할 일 ${Store.tasksOf(p.id).filter(t => t.status !== "done").length}개</small></div><button type="button" class="btn sm" data-edit="${p.id}">편집</button></div>`).join("")}</div>
       <div class="btn-row" style="margin-top:10px"><button type="button" class="btn sm" id="mAdd">${ico("plus", 15)}행성 추가</button></div>
+      <h4>화면</h4>
+      <label class="toggle-row"><span>위성 옆에 할 일 이름 항상 표시<br><small style="color:var(--ink-3)">끄면 행성에 마우스를 올렸을 때만 보여요</small></span><button type="button" class="switch ${Scene.showNames ? "on" : ""}" id="mNames" role="switch" aria-checked="${Scene.showNames}" aria-label="위성 이름 항상 표시"></button></label>
       <h4>앱으로 쓰기</h4><p class="desc" style="margin:0 0 10px">${how}</p>${App.installPrompt ? `<div class="btn-row"><button type="button" class="btn sol sm" id="mInstall">${ico("install", 15)}앱으로 설치</button></div>` : ""}
       <h4>데이터</h4>
       <div class="btn-row"><button type="button" class="btn sm" id="mExport">${ico("download", 15)}JSON 내보내기</button><button type="button" class="btn sm" id="mCopy">${ico("copy", 15)}복사</button><label class="btn sm" for="mFile">${ico("upload", 15)}가져오기</label><input type="file" id="mFile" accept="application/json,.json" hidden></div>
@@ -239,6 +243,7 @@ const Modal = {
     const c = this.card, on = (s, f) => { const el = c.querySelector(s); if (el) el.addEventListener("click", f); };
     c.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => this.planet(b.dataset.edit)));
     on("#mAdd", () => this.planet(null)); on("#mClose", () => this.close());
+    on("#mNames", e => { const b = e.currentTarget, v = !Scene.showNames; Scene.setNames(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
     on("#mInstall", async () => { const p = App.installPrompt; if (!p) return; p.prompt(); try { await p.userChoice; } catch (e) { /* 무시 */ } App.installPrompt = null; this.close(); });
     on("#mExport", () => { try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([Store.exportJSON()], { type: "application/json" })); a.download = `orbit-todo-${U.today()}.json`; a.click(); App.toast("download", "JSON 파일로 내보냈어요"); } catch (e) { App.toast("alert", "내보내지 못했어요. 복사를 이용해 주세요"); } });
     on("#mCopy", () => { navigator.clipboard.writeText(Store.exportJSON()).then(() => App.toast("copy", "클립보드에 복사했어요")).catch(() => App.toast("alert", "복사할 수 없는 환경이에요")); });

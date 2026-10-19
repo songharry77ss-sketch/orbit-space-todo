@@ -7,7 +7,7 @@ const GL = {
   init(canvas) {
     this.cv = canvas;
     let gl = null;
-    const opts = { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: true, powerPreference: "high-performance" };
+    const opts = { alpha: false, antialias: true, depth: true, stencil: false, premultipliedAlpha: true, powerPreference: "high-performance" };
     try { gl = canvas.getContext("webgl", opts) || canvas.getContext("experimental-webgl", opts); } catch (e) { gl = null; }
     if (!gl) return false;
     this.gl = gl;
@@ -22,10 +22,7 @@ const GL = {
     try {
       this.P.bg = this.program(GLSL.VS, GLSL.LIB + GLSL.BG);
       this.P.sky = this.program(GLSL.VS, GLSL.LIB + GLSL.SKY);
-      this.P.sun = this.program(GLSL.VS, GLSL.LIB + GLSL.SUN);
-      this.P.sphere = this.program(GLSL.VS, GLSL.LIB + GLSL.SPHERE);
-      this.P.ring = this.program(GLSL.VS, GLSL.RING);
-      this.P.orbit = this.program(GLSL.VS, GLSL.ORBIT);
+      G3.setup(this);
     } catch (e) { console.warn("[ORBIT] WebGL 셰이더 오류", e); this.ok = false; return false; }
     this.buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -50,7 +47,9 @@ const GL = {
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     const u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
     for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); u[info.name] = { loc: gl.getUniformLocation(p, info.name), type: info.type }; }
-    return { p, u, a: gl.getAttribLocation(p, "aPos") };
+    const attrs = {}, na = gl.getProgramParameter(p, gl.ACTIVE_ATTRIBUTES);
+    for (let i = 0; i < na; i++) { const info = gl.getActiveAttrib(p, i); attrs[info.name] = gl.getAttribLocation(p, info.name); }
+    return { p, u, a: gl.getAttribLocation(p, "aPos"), attrs };
   },
   solid(rgba) {
     const gl = this.gl, id = gl.createTexture();
@@ -94,11 +93,17 @@ const GL = {
     if (this.cv.width !== w || this.cv.height !== h) { this.cv.width = w; this.cv.height = h; }
     this.W = W; this.H = H; this.dpr = dpr;
   },
-  begin() { const gl = this.gl; gl.viewport(0, 0, this.cv.width, this.cv.height); gl.clearColor(0.01, 0.012, 0.025, 1); gl.clear(gl.COLOR_BUFFER_BIT); },
+  begin() { const gl = this.gl; gl.viewport(0, 0, this.cv.width, this.cv.height); gl.clearColor(0.01, 0.012, 0.025, 1); gl.depthMask(true); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.disable(gl.DEPTH_TEST); },
   use(prog) {
     const gl = this.gl; gl.useProgram(prog.p);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.buf); gl.enableVertexAttribArray(prog.a); gl.vertexAttribPointer(prog.a, 2, gl.FLOAT, false, 0, 0);
+    this.attribs(prog.attrs.aPos != null ? [prog.attrs.aPos] : []);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buf); gl.vertexAttribPointer(prog.a, 2, gl.FLOAT, false, 0, 0);
     this.cur = prog; this.unit = 0;
+  },
+  attribs(locs) {
+    const gl = this.gl; this.on = this.on || new Set();
+    for (const l of this.on) if (!locs.includes(l)) { gl.disableVertexAttribArray(l); this.on.delete(l); }
+    for (const l of locs) if (!this.on.has(l)) { gl.enableVertexAttribArray(l); this.on.add(l); }
   },
   set(name, v) {
     const u = this.cur.u[name]; if (!u) return; const gl = this.gl;
@@ -107,6 +112,7 @@ const GL = {
       case gl.FLOAT_VEC2: gl.uniform2f(u.loc, v[0], v[1]); break;
       case gl.FLOAT_VEC3: gl.uniform3f(u.loc, v[0], v[1], v[2]); break;
       case gl.FLOAT_VEC4: gl.uniform4f(u.loc, v[0], v[1], v[2], v[3]); break;
+      case gl.FLOAT_MAT4: gl.uniformMatrix4fv(u.loc, false, v); break;
       case gl.SAMPLER_2D: { const unit = this.unit++; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, v || this.blank); gl.uniform1i(u.loc, unit); break; }
     }
   },
@@ -147,37 +153,6 @@ const GL = {
     this.use(this.P.bg);
     this.set("uBuf", buf.tex); this.set("uTime", o.time); this.set("uOff", o.off); this.set("uDim", o.dim); this.set("uView", [this.W, this.H]); this.set("uStars", o.stars);
     this.quad(this.W / 2, this.H / 2, 1, this.W / 2, this.H / 2);
-  },
-  drawSun(o) {
-    this.use(this.P.sun);
-    this.set("uTex", this.texId(TEX.sun)); this.set("uTexOK", this.fadeIn(TEX.sun, 800));
-    this.set("uScale", o.half / o.R); this.set("uTime", o.time); this.set("uHeat", o.heat); this.set("uAA", 1.2 / o.R); this.set("uDim", o.dim);
-    this.quad(o.x, o.y, o.half);
-  },
-  drawSphere(o) {
-    this.use(this.P.sphere);
-    this.set("uTex", this.texId(o.tex)); this.set("uTexOK", this.fadeIn(o.tex, 700));
-    this.set("uNight", o.night ? this.texId(o.night) : null); this.set("uClouds", o.clouds ? this.texId(o.clouds) : null);
-    this.set("uHasNight", o.night && this.ready(o.night) ? 1 : 0); this.set("uHasClouds", o.clouds && this.ready(o.clouds) ? 1 : 0);
-    this.set("uScale", o.half / o.R); this.set("uAA", 1.15 / o.R);
-    this.set("uRot", o.rot || 0); this.set("uCloudRot", o.cloudRot || 0); this.set("uTilt", o.tilt || 0);
-    this.set("uLight", o.light); this.set("uAtm", o.atm || [0, 0, 0]); this.set("uAtmK", o.atmK || 0); this.set("uLimb", o.limb || 0);
-    this.set("uTint", o.tint || [1, 1, 1, 0]); this.set("uHalo", o.halo || [0, 0, 0, 0]); this.set("uFire", o.fire || 0);
-    this.set("uAlpha", o.alpha == null ? 1 : o.alpha); this.set("uTime", o.time || 0);
-    this.quad(o.x, o.y, o.half);
-  },
-  drawOrbit(o) {
-    this.use(this.P.orbit);
-    this.set("uScale", o.half / o.R); this.set("uRoll", o.roll); this.set("uRatio", o.ratio); this.set("uFront", o.front ? 1 : 0);
-    this.set("uW", 0.75 / o.R); this.set("uCol", o.color); this.set("uAlpha", o.alpha);
-    this.quad(o.x, o.y, o.half);
-  },
-  drawRing(o) {
-    const t = this.texId(o.tex); if (!t) return;
-    this.use(this.P.ring);
-    this.set("uRing", t); this.set("uScale", o.half / o.R); this.set("uRoll", o.roll); this.set("uRatio", o.ratio);
-    this.set("uLight", o.light); this.set("uFront", o.front ? 1 : 0); this.set("uAlpha", (o.alpha == null ? 1 : o.alpha) * this.fadeIn(o.tex, 700));
-    this.quad(o.x, o.y, o.half);
   },
 };
 
@@ -248,108 +223,5 @@ void main() {
   col *= mix(0.42, 1.0, smoothstep(0.95, 0.2, length(v)));
   col += (hash(fc + fract(uTime)) - 0.5) * 0.012;
   gl_FragColor = vec4(col * uDim, 1.0);
-}`,
-SUN: `
-uniform sampler2D uTex; uniform float uTexOK, uScale, uTime, uHeat, uAA, uDim;
-void main() {
-  vec2 p = vUv * uScale; float r = length(p);
-  vec3 col = vec3(0.0); float a = 0.0; float t = uTime;
-  if (r < 1.0 + uAA) {
-    float z = sqrt(max(0.0, 1.0 - r * r));
-    float lon = atan(p.x, z) + t * 0.012; float lat = asin(clamp(p.y, -1.0, 1.0));
-    vec2 uv = vec2(0.5 + lon * 0.1591549, 0.5 - lat * 0.3183099);
-    vec2 w = vec2(fbm2(uv * vec2(9.0, 4.5) + t * 0.05), fbm2(uv * vec2(9.0, 4.5) - t * 0.04 + 3.1)) - 0.5;
-    vec3 tex = texture2D(uTex, uv + w * 0.01).rgb;
-    tex = mix(vec3(1.0, 0.55, 0.12) * (0.75 + 0.5 * fbm2(uv * 30.0 + t * 0.1)), tex, uTexOK);
-    float gran = fbm2(uv * vec2(70.0, 35.0) + vec2(t * 0.12, -t * 0.08));
-    vec3 base = pow(tex, vec3(0.82)) * (1.16 + 0.4 * uHeat) + (gran - 0.5) * 0.12;
-    float limb = pow(z, 0.45);
-    col = mix(vec3(0.62, 0.12, 0.01), base, limb) * (0.78 + 0.42 * limb);
-    col = mix(col, vec3(1.0, 0.95, 0.82), 0.14 * uHeat * limb);
-    a = clamp((1.0 - r) / uAA + 0.5, 0.0, 1.0);
-  }
-  vec2 dir = p / max(r, 1e-4); float d = max(r - 1.0, 0.0);
-  float rays = fbm3(vec3(dir * 2.4, d * 1.1 - t * 0.10));
-  float rays2 = 0.5 + 0.5 * noise3(vec3(dir * 6.0 + 7.0, d * 2.4 - t * 0.22));
-  float k = mix(4.8, 2.8, uHeat);
-  float cor = exp(-d * k) * (0.35 + 1.25 * rays * rays2);
-  float inner = exp(-d * 16.0);
-  vec3 cc = mix(vec3(1.0, 0.38, 0.10), vec3(1.0, 0.80, 0.50), exp(-d * 2.6));
-  vec3 glow = cc * (cor * (0.48 + 0.75 * uHeat) + inner * (0.8 + 0.45 * uHeat));
-  if (uHeat > 0.01 && d < 0.6) { float pr = smoothstep(0.58, 0.8, fbm3(vec3(dir * 4.5, t * 0.3))) * exp(-d * 9.0) * uHeat * 1.8; glow += vec3(1.0, 0.42, 0.10) * pr; }
-  glow += vec3(1.0, 0.56, 0.26) * exp(-d * 1.25) * (0.10 + 0.12 * uHeat);
-  glow *= (1.0 - smoothstep(uScale * 0.7, uScale, r)) * (1.0 - a);
-  gl_FragColor = vec4(col * a + glow, a) * uDim;
-}`,
-SPHERE: `
-uniform sampler2D uTex, uNight, uClouds;
-uniform float uTexOK, uHasNight, uHasClouds, uScale, uAA, uRot, uCloudRot, uTilt, uAtmK, uLimb, uFire, uAlpha, uTime;
-uniform vec3 uLight, uAtm; uniform vec4 uTint, uHalo;
-void main() {
-  vec2 p = vUv * uScale; float r2 = dot(p, p); float r = sqrt(r2);
-  vec3 col = vec3(0.0); float a = 0.0; vec3 glow = vec3(0.0);
-  if (r < 1.0 + uAA) {
-    float z = sqrt(max(0.0, 1.0 - r2));
-    vec3 n = vec3(p, z);
-    float c = cos(uTilt), s = sin(uTilt);
-    vec3 b = vec3(c * n.x + s * n.y, -s * n.x + c * n.y, n.z);
-    float lon = atan(b.x, b.z) + uRot; float lat = asin(clamp(b.y, -1.0, 1.0));
-    vec2 uv = vec2(0.5 + lon * 0.1591549, 0.5 - lat * 0.3183099);
-    vec3 tex = mix(vec3(0.22, 0.23, 0.28), texture2D(uTex, uv).rgb, uTexOK);
-    tex = mix(tex, tex * uTint.rgb * 1.45, uTint.a);
-    if (uHasClouds > 0.5) { float cl = pow(texture2D(uClouds, vec2(uv.x + uCloudRot, uv.y)).r, 1.15) * 0.92; tex = mix(tex, vec3(0.96), cl); }
-    float d = dot(n, uLight);
-    float lit = smoothstep(-0.14, 0.5, d) * (0.62 + 0.38 * clamp(d, 0.0, 1.0));
-    lit *= 1.0 - uLimb * pow(1.0 - z, 1.6);
-    col = tex * (0.03 + 0.97 * lit);
-    if (uHasNight > 0.5) col += texture2D(uNight, uv).rgb * 1.25 * (1.0 - smoothstep(-0.25, 0.12, d));
-    col += uAtm * pow(1.0 - z, 2.6) * 0.55 * uAtmK * smoothstep(-0.35, 0.6, d);
-    if (uFire > 0.0) {
-      float f = noise(uv * vec2(18.0, 9.0) + vec2(uTime * 0.6, -uTime * 0.9)) * 0.6 + noise(uv * vec2(40.0, 20.0) - uTime * 1.3) * 0.4;
-      vec3 fire = mix(vec3(1.0, 0.32, 0.04), vec3(1.0, 0.86, 0.5), f) * (0.85 + 0.5 * pow(z, 0.5));
-      col = mix(col, fire, uFire);
-    }
-    a = clamp((1.0 - r) / uAA + 0.5, 0.0, 1.0);
-  }
-  vec2 dir = p / max(r, 1e-4);
-  vec2 ld = uLight.xy / max(length(uLight.xy), 1e-4);
-  if (uAtmK > 0.0) glow += uAtm * exp(-max(r - 1.0, 0.0) * 18.0) * 0.6 * uAtmK * smoothstep(-0.5, 0.7, dot(dir, ld));
-  if (uHalo.a > 0.0) { float hr = r - 1.55; glow += uHalo.rgb * uHalo.a * (exp(-hr * hr / 0.012) * 0.9 + exp(-max(r - 1.0, 0.0) * 4.5) * 0.35); }
-  if (uFire > 0.0) glow += vec3(1.0, 0.5, 0.15) * exp(-max(r - 1.0, 0.0) * 3.5) * 0.9 * uFire;
-  glow *= (1.0 - smoothstep(uScale * 0.72, uScale, r)) * (1.0 - a);
-  gl_FragColor = vec4(col * a + glow, a) * uAlpha;
-}`,
-ORBIT: `
-varying vec2 vUv;
-uniform float uScale, uRoll, uRatio, uFront, uW, uAlpha; uniform vec3 uCol;
-void main() {
-  vec2 p = vUv * uScale; vec2 ps = vec2(p.x, -p.y);
-  float c = cos(uRoll), s = sin(uRoll);
-  float lx = ps.x * c + ps.y * s, ly = -ps.x * s + ps.y * c;
-  if ((uFront > 0.5) != (ly > 0.0)) discard;
-  float rr = length(vec2(lx, ly / uRatio));
-  float w = uW * (1.0 + 0.0 * ly);
-  float line = exp(-pow((rr - 1.0) / w, 2.0));
-  float depth = 0.55 + 0.45 * clamp(ly / max(uRatio, 1e-3), -1.0, 1.0);
-  float a = line * uAlpha * depth;
-  gl_FragColor = vec4(uCol * a, a);
-}`,
-RING: `
-varying vec2 vUv;
-uniform sampler2D uRing; uniform float uScale, uRoll, uRatio, uFront, uAlpha; uniform vec3 uLight;
-void main() {
-  vec2 p = vUv * uScale;
-  float c = cos(uRoll), s = sin(uRoll);
-  vec2 q = vec2(c * p.x + s * p.y, -s * p.x + c * p.y);
-  float rr = length(vec2(q.x, q.y / uRatio));
-  float t = (rr - 1.24) / 1.03;
-  if (t < 0.0 || t > 1.0) discard;
-  bool front = q.y < 0.0;
-  if ((uFront > 0.5) != front) discard;
-  vec4 ring = texture2D(uRing, vec2(t, 0.5));
-  vec2 ld = uLight.xy / max(length(uLight.xy), 1e-4);
-  float lk = 0.32 + 0.68 * smoothstep(-0.6, 0.6, dot(p / max(length(p), 1e-4), ld));
-  float al = ring.a * uAlpha;
-  gl_FragColor = vec4(ring.rgb * lk * al, al);
 }`,
 };
