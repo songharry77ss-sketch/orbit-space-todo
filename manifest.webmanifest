@@ -1,14 +1,14 @@
 {
   "name": "ORBIT 우주 할 일",
   "short_name": "ORBIT",
-  "description": "행성은 카테고리, 위성은 할 일. 태양에 올리면 불타오르는 우주 테마 투두리스트",
+  "description": "실제 행성 사진으로 만든 우주에서, 할 일을 태양에 올려 불태우는 투두리스트",
   "lang": "ko",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#05071a",
-  "theme_color": "#05071a",
+  "background_color": "#04050b",
+  "theme_color": "#04050b",
   "categories": ["productivity", "utilities"],
   "icons": [
     { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
@@ -17,7 +17,7 @@
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "오늘 할 일", "url": "./index.html#today", "description": "오늘 보기로 열기" },
-    { "name": "캘린더", "url": "./index.html#calendar", "description": "캘린더 보기로 열기" }
+    { "name": "오늘 할 일", "url": "./index.html#today", "description": "실제 행성 사진으로 만든 우주에서, 할 일을 태양에 올려 불태우는 투두리스트" },
+    { "name": "캘린더", "url": "./index.html#calendar", "description": "실제 행성 사진으로 만든 우주에서, 할 일을 태양에 올려 불태우는 투두리스트" }
   ]
 }

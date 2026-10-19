@@ -1,9 +1,12 @@
-/* ORBIT 서비스 워커: 온라인이면 항상 최신 파일을 쓰고, 오프라인이면 캐시로 열립니다. 설치형 앱(PWA) 요건도 충족합니다. */
-const CACHE = "orbit-v2";
+/* ORBIT 서비스 워커: 온라인이면 항상 최신 파일, 오프라인이면 캐시로 열립니다. 설치형 앱(PWA) 요건도 충족합니다. */
+const CACHE = "orbit-v3";
 const SHELL = [
-  "./", "./index.html", "./manifest.webmanifest",
-  "./css/style.css",
-  "./js/utils.js", "./js/store.js", "./js/sky.js", "./js/scene.js", "./js/mobile.js", "./js/panel.js", "./js/calendar.js", "./js/app.js",
+  "./", "./index.html", "./manifest.webmanifest", "./css/style.css",
+  "./js/utils.js", "./js/bodies.js", "./js/icons.js", "./js/store.js", "./js/gl.js", "./js/fx.js", "./js/scene.js", "./js/panel.js", "./js/calendar.js", "./js/app.js",
+  "./textures/sun.jpg", "./textures/moon.jpg", "./textures/earth_daymap.jpg", "./textures/earth_nightmap.jpg", "./textures/earth_clouds.jpg",
+  "./textures/jupiter.jpg", "./textures/mars.jpg", "./textures/neptune.jpg", "./textures/saturn.jpg", "./textures/saturn_ring.png",
+  "./textures/venus_atmosphere.jpg", "./textures/uranus.jpg", "./textures/mercury.jpg", "./textures/stars_milky_way_2k.jpg",
+  ...["sun", "moon", "earth", "jupiter", "mars", "neptune", "saturn", "venus", "uranus", "mercury"].map(k => `./textures/thumbs/${k}.png`),
   "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-512.png", "./icons/apple-touch-icon.png",
 ];
 self.addEventListener("install", e => {
@@ -16,10 +19,10 @@ self.addEventListener("fetch", e => {
   const req = e.request; if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin === location.origin) {
-    // 앱 파일: 네트워크 우선(항상 최신), 실패하면 캐시(오프라인)
-    e.respondWith(fetch(req, { cache: "no-cache" }).then(res => { if (res.ok) caches.open(CACHE).then(c => c.put(req, res.clone())); return res; }).catch(() => caches.match(req).then(hit => hit || caches.match("./index.html"))));
-  } else if (/fonts\.(googleapis|gstatic)\.com/.test(url.host)) {
-    // 글꼴: 캐시 우선
+    if (url.pathname.endsWith("textures-inline.js")) return;
+    e.respondWith(fetch(req, { cache: "no-cache" }).then(res => { if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return res; })
+      .catch(() => caches.match(req, { ignoreSearch: true }).then(hit => hit || caches.match("./index.html"))));
+  } else if (/(fonts\.(googleapis|gstatic)\.com|cdn\.jsdelivr\.net)$/.test(url.host)) {
     e.respondWith(caches.open(CACHE + "-fonts").then(async c => {
       const hit = await c.match(req); if (hit) return hit;
       try { const res = await fetch(req); if (res.ok) c.put(req, res.clone()); return res; } catch (err) { return new Response("", { status: 408 }); }

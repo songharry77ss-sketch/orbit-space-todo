@@ -6,7 +6,6 @@ const Store = {
   state: null,
   listeners: [],
   COLORS: ["#4f8cff", "#a66cff", "#ff6cab", "#ff5a5a", "#ff9f43", "#ffd93d", "#4ade80", "#2dd4bf", "#38bdf8", "#f472b6"],
-  LOOKS: [["plain", "매끈"], ["banded", "줄무늬"], ["ringed", "고리"], ["rocky", "암석"], ["icy", "얼음"]],
   REPEATS: [["none", "반복 없음"], ["daily", "매일"], ["weekdays", "평일"], ["weekly", "매주"], ["monthly", "매월"]],
 
   load() {
@@ -16,6 +15,9 @@ const Store = {
     } catch (e) { /* 저장소 사용 불가 */ }
     if (!this.state) this.state = this.seed();
     this.state.settings = Object.assign({ view: "today", hintSeen: false }, this.state.settings || {});
+    // 행성 → 실제 천체 매핑 (이전 버전 데이터 이전)
+    const used = new Set(this.state.planets.filter(p => BODIES[p.body]).map(p => p.body));
+    this.planets().forEach(p => { if (!BODIES[p.body]) { p.body = BODY_ORDER.find(k => !used.has(k)) || "earth"; used.add(p.body); } delete p.emoji; delete p.look; delete p.color; });
     const cutoff = Date.now() - 60 * 86400000;
     this.state.tasks = this.state.tasks.filter(t => !(t.status === "done" && t.completedAt && t.completedAt < cutoff));
   },
@@ -69,11 +71,12 @@ const Store = {
   /* ── 행성 ── */
   addPlanet(data) {
     const order = this.state.planets.length ? Math.max(...this.state.planets.map(p => p.order)) + 1 : 0;
-    const p = Object.assign({ id: U.uid(), name: "새 행성", color: this.COLORS[order % this.COLORS.length], emoji: "🪐", look: "plain", order, createdAt: Date.now() }, data);
+    const p = Object.assign({ id: U.uid(), name: "새 행성", body: this.freeBody(), order, createdAt: Date.now() }, data);
     this.state.planets.push(p);
     this.emit({ type: "planet-add", id: p.id });
     return p;
   },
+  freeBody() { const used = new Set(this.state.planets.map(p => p.body)); return BODY_ORDER.find(k => !used.has(k)) || BODY_ORDER[this.state.planets.length % BODY_ORDER.length]; },
   updatePlanet(id, patch) { const p = this.planet(id); if (!p) return; Object.assign(p, patch); this.emit({ type: "planet-update", id }); },
   removePlanet(id, moveToId) {
     if (this.state.planets.length <= 1) return false;
@@ -156,7 +159,7 @@ const Store = {
     this.state = s; this.load(); this.emit({ type: "reset" });
   },
   reset(withSample) {
-    this.state = withSample ? this.seed() : { planets: [{ id: U.uid(), name: "기타", color: this.COLORS[0], emoji: "🪐", look: "plain", order: 0, createdAt: Date.now() }], tasks: [], settings: {} };
+    this.state = withSample ? this.seed() : { planets: [{ id: U.uid(), name: "할 일", body: "earth", order: 0, createdAt: Date.now() }], tasks: [], settings: {} };
     this.load(); this.emit({ type: "reset" });
   },
 };
@@ -164,12 +167,12 @@ const Store = {
 /* ── 첫 실행 예시 데이터 ── */
 Store.seed = function () {
   const T = U.today(), now = Date.now(), d = n => U.addDays(T, n);
-  const P = (name, emoji, color, look, order) => ({ id: U.uid(), name, emoji, color, look, order, createdAt: now });
-  const work = P("업무", "💼", "#4f8cff", "banded", 0);
-  const study = P("공부", "📚", "#a66cff", "ringed", 1);
-  const fit = P("운동", "🏃", "#ff9f43", "rocky", 2);
-  const life = P("생활", "🏠", "#4ade80", "icy", 3);
-  const hobby = P("취미", "🎨", "#ff6cab", "plain", 4);
+  const P = (name, body, order) => ({ id: U.uid(), name, body, order, createdAt: now });
+  const work = P("업무", "earth", 0);
+  const study = P("공부", "jupiter", 1);
+  const fit = P("운동", "mars", 2);
+  const life = P("생활", "neptune", 3);
+  const hobby = P("취미", "saturn", 4);
   let i = 0;
   const K = (planet, title, o = {}) => Object.assign({
     id: U.uid(), title, notes: "", planetId: planet.id, due: null, time: null, important: false, myDay: null,

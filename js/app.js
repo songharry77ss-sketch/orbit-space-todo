@@ -1,298 +1,295 @@
-/* ═══════════════ 앱: 초기화, 보기 전환, 빠른 추가, 검색, 단축키, 토스트, 모달 ═══════════════ */
+/* ═══════════════ 앱: 초기화 · 보기 전환 · 헤더 · 단축키 · 동작 · 토스트 ═══════════════ */
 "use strict";
 
+const $ = sel => document.querySelector(sel);
+
 const App = {
-  view: "today", day: null,
+  view: "today", day: null, installPrompt: null, _sub: "",
   init() {
     Store.load(); this.day = U.today();
-    Sky.init(document.getElementById("sky")); FX.init(document.getElementById("fx"));
-    Scene.init(); Panel.init(); Calendar.init(); QuickAdd.init(); Search.init();
-    document.querySelectorAll(".view-tabs .tab").forEach(b => b.addEventListener("click", () => this.setView(b.dataset.view)));
-    document.getElementById("settingsBtn").addEventListener("click", () => Modal.settings());
-    document.getElementById("progressBtn").addEventListener("click", () => this.openToday());
-    document.getElementById("modal").addEventListener("click", e => { if (e.target.closest("[data-action='modal-close']")) Modal.close(); });
+    document.querySelectorAll("[data-ico]").forEach(el => { el.outerHTML = ico(el.dataset.ico, 18); });
+    Scene.init(); Panel.init(); Calendar.init(); QuickAdd.init(); Palette.init();
+    document.querySelectorAll(".seg-btn").forEach(b => b.addEventListener("click", () => this.setView(b.dataset.view)));
+    $("#searchBtn").addEventListener("click", () => Palette.open());
+    $("#settingsBtn").addEventListener("click", () => Modal.settings());
+    $("#progressBtn").addEventListener("click", () => this.openToday());
+    $("#modal").addEventListener("click", e => { if (e.target.closest("[data-close]")) Modal.close(); });
     document.addEventListener("keydown", e => this.onKey(e));
     Store.on(d => this.onChange(d));
-    const hash = (location.hash || "").replace("#", "");
+    const hash = location.hash.replace("#", "");
     this.setView(["today", "all", "calendar"].includes(hash) ? hash : (Store.state.settings.view || "today"));
-    this.renderDate(); this.updateProgress();
-    setInterval(() => Panel.tickSecond(), 1000);
+    this.renderHeader();
+    setInterval(() => { Panel.tick(); this.renderHeader(); }, 1000);
     setInterval(() => this.checkDay(), 30000);
-    if (!Store.state.settings.hintSeen) { this.hint("🪐 위성(할 일)을 가운데 태양으로 끌어다 놓으면 집중이 시작됩니다", 9000); Store.setSetting("hintSeen", true); }
+    window.addEventListener("resize", () => this.placeSeg());
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.placeSeg());
+    if (!Store.state.settings.hintSeen) { setTimeout(() => this.toast("sparkle", "위성을 끌어 가운데 태양에 올려 보세요"), 1400); Store.setSetting("hintSeen", true); }
   },
   onChange(d) {
     Scene.sync(d);
-    if (!d.silent) { Panel.refresh(d); Calendar.render(); }
-    this.updateProgress(); QuickAdd.refreshPlanets();
+    if (!d.silent) { Panel.refresh(); Calendar.render(); }
+    this.renderHeader(); QuickAdd.refresh();
   },
   setView(v) {
     if (!["today", "all", "calendar"].includes(v)) v = "today";
     this.view = v; document.body.dataset.view = v;
-    document.querySelectorAll(".view-tabs .tab").forEach(b => b.setAttribute("aria-selected", b.dataset.view === v ? "true" : "false"));
-    const cal = document.getElementById("calendar");
-    if (v === "calendar") { cal.hidden = false; Calendar.render(); }
-    else { cal.hidden = true; Scene.setFilter(v === "today" ? "today" : "all"); }
+    document.querySelectorAll(".seg-btn").forEach(b => b.setAttribute("aria-selected", b.dataset.view === v ? "true" : "false"));
+    this.placeSeg();
+    const cal = $("#calendar");
+    if (v === "calendar") { cal.hidden = false; Calendar.render(); } else cal.hidden = true;
+    Scene.setView(v);
     Store.setSetting("view", v); QuickAdd.onView(v);
   },
-  renderDate() { document.getElementById("todayLabel").textContent = U.fmtLong(U.today()); },
-  updateProgress() {
-    const s = Store.todayStats(), ring = document.getElementById("progressRing"), btn = document.getElementById("progressBtn");
-    const pct = s.total ? s.done / s.total : 0;
-    ring.style.strokeDashoffset = (113.1 * (1 - pct)).toFixed(1);
-    document.getElementById("progressText").textContent = `${s.done}/${s.total}`;
-    btn.classList.toggle("complete", s.total > 0 && s.done === s.total);
-    btn.title = s.total ? `오늘 ${s.total}개 중 ${s.done}개 완료${s.doing ? ` · ${s.doing}개 진행 중` : ""}${s.overdue ? ` · ${s.overdue}개 지남` : ""}` : "오늘의 미션";
+  placeSeg() {
+    const b = document.querySelector(`.seg-btn[aria-selected="true"]`), th = $(".seg-thumb"); if (!b || !th) return;
+    th.style.width = `${b.offsetWidth}px`; th.style.transform = `translateX(${b.offsetLeft}px)`;
   },
-  checkDay() { if (this.day !== U.today()) { this.day = U.today(); this.renderDate(); Scene.sync({ type: "day" }); Panel.refresh(); Calendar.render(); this.updateProgress(); QuickAdd.onView(this.view); } },
+  renderHeader() {
+    const today = U.today(), d = U.parseDate(today);
+    const date = `${d.getMonth() + 1}월 ${d.getDate()}일 ${U.weekday(today)}요일`;
+    const s = Store.todayStats(), remain = s.total - s.done, burn = Store.burnedToday();
+    const sub = `<span>남은 할 일 <b>${remain}</b></span><span>완료 <b>${s.done}</b></span>${burn >= 60 || s.doing ? `<span class="s-fire">집중 <b>${U.fmtDuration(burn)}</b></span>` : ""}${s.overdue ? `<span>지남 <b class="late">${s.overdue}</b></span>` : ""}`;
+    const dEl = $("#todayDate"); if (dEl.textContent !== date) dEl.textContent = date;
+    if (sub !== this._sub) { $("#todaySub").innerHTML = sub; this._sub = sub; }
+    const pct = s.total ? s.done / s.total : 0, ring = $("#progressRing"), btn = $("#progressBtn");
+    ring.style.strokeDashoffset = (103.67 * (1 - pct)).toFixed(2);
+    const txt = s.total ? `${s.done}/${s.total}` : "0"; const num = $("#progressText"); if (num.textContent !== txt) num.textContent = txt;
+    btn.classList.toggle("complete", s.total > 0 && s.done === s.total);
+    btn.title = s.total ? `오늘 ${s.total}개 중 ${s.done}개 완료` : "오늘의 미션";
+  },
+  checkDay() { if (this.day !== U.today()) { this.day = U.today(); Scene.sync({ type: "day" }); Panel.refresh(); Calendar.render(); this.renderHeader(); QuickAdd.onView(this.view); } },
   onKey(e) {
-    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+    const ae = document.activeElement, typing = ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable);
     if (e.key === "Escape") {
-      if (!document.getElementById("modal").hidden) { Modal.close(); return; }
+      if (!$("#palette").hidden) return Palette.close();
+      if (!$("#modal").hidden) return Modal.close();
       if (QuickAdd.closePops()) return;
-      if (typing) { document.activeElement.blur(); Search.clear(); return; }
-      if (!document.getElementById("panel").hidden) { Panel.close(); return; }
+      if (typing) { ae.blur(); return; }
+      if (!$("#sheet").hidden) return Panel.close();
       return;
     }
-    if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === "n" || e.key === "N" || e.key === "ㅜ") { e.preventDefault(); QuickAdd.input.focus(); }
-    else if (e.key === "/") { e.preventDefault(); Search.input.focus(); }
-    else if (e.key === "1") this.setView("today");
-    else if (e.key === "2") this.setView("all");
-    else if (e.key === "3") this.setView("calendar");
-    else if (e.key === "t" || e.key === "T") this.openToday();
+    if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); Palette.open(); return; }
+    if (typing || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    const k = e.key;
+    if (k === "n" || k === "N" || k === "ㅜ") { e.preventDefault(); QuickAdd.input.focus(); }
+    else if (k === "/") { e.preventDefault(); Palette.open(); }
+    else if (k === "1") this.setView("today"); else if (k === "2") this.setView("all"); else if (k === "3") this.setView("calendar");
+    else if (k === "t" || k === "T" || k === "ㅅ") this.openToday();
   },
-
-  /* ── 열기 ── */
   openTask(id) { if (Store.task(id)) Panel.open("task", id); },
   openPlanet(id) { if (Store.planet(id)) Panel.open("planet", id); },
   openDay(date) { Panel.open("day", null, date); },
   openToday() { Panel.open("today"); },
   openNoDue() { Panel.open("nodue"); },
 
-  /* ── 동작 ── */
   startTask(id) {
     const t = Store.task(id); if (!t || t.status === "doing") return;
     Store.startTask(id);
-    FX.ring(Scene.cx, Scene.cy, Scene.sunR, "#ffd166", 240, .9); FX.burst(Scene.cx, Scene.cy, "#ff9f43", 36, 1.5);
-    this.toast("🔥", `「${t.title}」 집중 시작!`);
+    const s = Scene.sun; FX.ring(s.X, s.Y, s.R, "#ffd59a", 260, 1); FX.ring(s.X, s.Y, s.R * 0.8, "#ff8a4a", 180, 0.8); FX.burst(s.X, s.Y, "#ffb060", 40, 1.5);
+    this.toast("flame", `「${t.title}」 점화 · 집중을 시작해요`);
   },
   completeTask(id) {
     const t = Store.task(id); if (!t || t.status === "done") return;
     const title = t.title, res = Store.completeTask(id); if (!res) return;
-    const spawnedId = res.spawned ? res.spawned.id : null;
-    this.toast("✅", `「${title}」 완료!${res.spawned ? ` 다음 반복: ${U.relDate(res.spawned.due)}` : ""}`, () => Store.uncompleteTask(id, spawnedId));
-    const s = Store.todayStats(); if (s.total && s.done === s.total) setTimeout(() => this.toast("🎉", "오늘 할 일을 모두 마쳤어요!"), 600);
+    const sp = res.spawned ? res.spawned.id : null;
+    this.toast("check", `「${title}」 완료${res.spawned ? ` · 다음 반복 ${U.relDate(res.spawned.due)}` : ""}`, () => Store.uncompleteTask(id, sp));
+    const s = Store.todayStats();
+    if (s.total && s.done === s.total) setTimeout(() => { const sun = Scene.sun; FX.ring(sun.X, sun.Y, sun.R, "#7ee2a8", 420, 1.6); this.toast("sparkle", "오늘 할 일을 모두 끝냈어요"); }, 700);
   },
   deleteTask(id) {
     const t = Store.removeTask(id); if (!t) return;
     if (Panel.mode === "task" && Panel.id === id) Panel.close();
-    this.toast("🗑", `「${t.title}」 삭제`, () => Store.restoreTask(t));
+    this.toast("trash", `「${t.title}」 삭제`, () => Store.restoreTask(t));
   },
-
-  /* ── 토스트 / 힌트 ── */
-  toast(ico, msg, undo) {
-    const box = document.getElementById("toasts");
+  toast(icon, msg, undo) {
+    const box = $("#toasts");
     while (box.children.length >= 3) box.firstElementChild.remove();
     const el = document.createElement("div"); el.className = "toast";
-    el.innerHTML = `<span class="ico">${ico}</span><span class="msg">${U.esc(msg)}</span>${undo ? `<button type="button" class="undo">실행 취소</button>` : ""}`;
+    el.innerHTML = `${ico(icon, 17)}<span class="msg">${U.esc(msg)}</span>${undo ? `<button type="button" class="undo">실행 취소</button>` : ""}`;
     if (undo) el.querySelector(".undo").addEventListener("click", () => { undo(); el.remove(); });
     box.appendChild(el);
-    setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 300); }, undo ? 6000 : 3500);
+    setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 300); }, undo ? 6000 : 3200);
   },
-  hint(msg, ms) { const h = document.getElementById("hint"); h.textContent = msg; h.hidden = false; clearTimeout(this._hint); this._hint = setTimeout(() => { h.hidden = true; }, ms || 5000); },
 };
 
-/* ═══════════════ 빠른 추가 ═══════════════ */
+/* ═══════════════ 커맨드 바: 빠른 추가 (입력하는 동안 행성·날짜를 미리 보여 줌) ═══════════════ */
 const QuickAdd = {
-  form: null, input: null, planetBtn: null, dateBtn: null, planetPop: null, datePop: null, planetId: null, due: null, time: null,
+  form: null, input: null, planetBtn: null, dateBtn: null, popP: null, popD: null, planetId: null, due: null, time: null, preview: null,
   init() {
-    this.form = document.getElementById("quickAdd"); this.input = document.getElementById("qaInput");
-    this.planetBtn = document.getElementById("qaPlanet"); this.dateBtn = document.getElementById("qaDate");
-    this.planetPop = document.getElementById("qaPlanetPop"); this.datePop = document.getElementById("qaDatePop");
+    this.form = $("#cmd"); this.input = $("#cmdInput"); this.planetBtn = $("#cmdPlanet"); this.dateBtn = $("#cmdDate"); this.popP = $("#popPlanet"); this.popD = $("#popDate");
     this.form.addEventListener("submit", e => { e.preventDefault(); this.submit(); });
-    this.planetBtn.addEventListener("click", () => this.togglePop("planet"));
-    this.dateBtn.addEventListener("click", () => this.togglePop("date"));
+    this.input.addEventListener("input", () => this.live());
+    this.planetBtn.addEventListener("click", () => this.toggle("planet"));
+    this.dateBtn.addEventListener("click", () => this.toggle("date"));
     document.addEventListener("pointerdown", e => { if (!this.form.contains(e.target)) this.closePops(); }, true);
-    this.planetPop.addEventListener("click", e => {
-      const it = e.target.closest("[data-pid]"); if (it) { this.setPlanet(it.dataset.pid); this.closePops(); this.input.focus(); return; }
-      if (e.target.closest("[data-add-planet]")) { this.closePops(); Modal.planet(null); }
+    this.popP.addEventListener("click", e => {
+      const it = e.target.closest("[data-pid]");
+      if (it) { this.planetId = it.dataset.pid; this.paint(); this.closePops(); this.input.focus(); }
+      else if (e.target.closest("[data-new]")) { this.closePops(); Modal.planet(null); }
     });
-    this.datePop.addEventListener("click", e => {
-      const it = e.target.closest("[data-due]"); if (it) { this.setDue(it.dataset.due || null); this.closePops(); this.input.focus(); }
+    this.popD.addEventListener("click", e => { const it = e.target.closest("[data-due]"); if (it) { this.setDue(it.dataset.due || null); this.closePops(); this.input.focus(); } });
+    this.popD.addEventListener("change", e => {
+      if (e.target.id === "qaDate") this.setDue(e.target.value || null);
+      if (e.target.id === "qaTime") { this.time = e.target.value || null; if (this.time && !this.due) this.due = U.today(); this.paint(); }
     });
-    this.datePop.addEventListener("change", e => {
-      if (e.target.id === "qaDateInput") this.setDue(e.target.value || null);
-      if (e.target.id === "qaTimeInput") { this.time = e.target.value || null; if (this.time && !this.due) this.setDue(U.today()); else this.renderDateChip(); }
-    });
-    this.refreshPlanets(); this.setDue(U.today());
+    this.refresh(); this.setDue(U.today());
   },
-  onView(v) { this.setDue(v === "today" ? U.today() : null); this.input.placeholder = v === "calendar" ? "선택한 날짜에 할 일 추가…  #행성  !중요" : "할 일 추가…  #행성  !중요  내일 오후 3시"; },
-  refreshPlanets() {
-    const ps = Store.planets(); if (!ps.length) return;
-    if (!ps.find(p => p.id === this.planetId)) this.planetId = ps[0].id;
-    this.setPlanet(this.planetId);
-    if (!this.planetPop.hidden) this.renderPlanetPop();
+  onView(v) {
+    this.setDue(v === "today" ? U.today() : null);
+    this.input.placeholder = window.innerWidth < 640 ? "새 할 일" : v === "calendar" ? "선택한 날짜에 할 일 추가  ·  #행성  !중요" : "새 할 일  ·  #행성  !중요  내일 오후 3시";
   },
-  setPlanet(id) {
-    const p = Store.planet(id); if (!p) return; this.planetId = id;
-    this.planetBtn.style.setProperty("--c", p.color); this.planetBtn.querySelector(".qa-chip-text").textContent = `${p.emoji || ""} ${p.name}`.trim();
+  refresh() { const ps = Store.planets(); if (!ps.length) return; if (!ps.find(p => p.id === this.planetId)) this.planetId = ps[0].id; this.paint(); if (!this.popP.hidden) this.renderPlanets(); },
+  setDue(d) { this.due = d; if (!d) this.time = null; this.paint(); },
+  paint() {
+    const pv = this.preview || {}, p = Store.planet(pv.planetId || this.planetId) || Store.planets()[0]; if (!p) return;
+    this.planetBtn.innerHTML = `${thumbImg(bodyKey(p), 28)}<span class="nm">${U.esc(p.name)}</span>${ico("chevDown", 14)}`;
+    this.planetBtn.title = `${p.name} 행성에 추가`;
+    const due = pv.due || this.due, time = pv.time || this.time;
+    const txt = due ? `${U.relDate(due)}${time ? " " + U.fmtTime(time) : ""}` : "기한 없음";
+    this.dateBtn.querySelector(".txt").textContent = txt; this.dateBtn.classList.toggle("on", !!due);
   },
-  setDue(d) { this.due = d; if (!d) this.time = null; this.renderDateChip(); },
-  renderDateChip() {
-    const txt = this.due ? `${U.relDate(this.due)}${this.time ? " " + U.fmtTime(this.time) : ""}` : "기한 없음";
-    this.dateBtn.querySelector(".qa-chip-text").textContent = txt; this.dateBtn.classList.toggle("has-date", !!this.due);
-    this.dateBtn.title = `마감일: ${txt}`;
-  },
-  togglePop(which) {
-    const pop = which === "planet" ? this.planetPop : this.datePop, open = pop.hidden;
+  live() { const q = U.parseQuick(this.input.value, Store.planets()); this.preview = q.planetId || q.due || q.time ? { planetId: q.planetId, due: q.due, time: q.time } : null; this.paint(); },
+  toggle(which) {
+    const pop = which === "planet" ? this.popP : this.popD, btn = which === "planet" ? this.planetBtn : this.dateBtn, open = pop.hidden;
     this.closePops();
-    if (open) { if (which === "planet") this.renderPlanetPop(); else this.renderDatePop(); pop.hidden = false; (which === "planet" ? this.planetBtn : this.dateBtn).classList.add("open"); }
+    if (open) { if (which === "planet") this.renderPlanets(); else this.renderDates(); pop.hidden = false; btn.classList.add("open"); }
   },
-  closePops() { const was = !this.planetPop.hidden || !this.datePop.hidden; this.planetPop.hidden = true; this.datePop.hidden = true; this.planetBtn.classList.remove("open"); this.dateBtn.classList.remove("open"); return was; },
-  renderPlanetPop() {
-    this.planetPop.innerHTML = `<div class="pop-title">어느 행성에 추가할까요?</div>` + Store.planets().map(p => `<button type="button" class="pop-item ${p.id === this.planetId ? "sel" : ""}" data-pid="${p.id}" style="--c:${p.color}"><span class="dot"></span><span class="lbl">${U.esc(p.emoji || "")} ${U.esc(p.name)}</span><span class="sub">${Store.tasksOf(p.id).filter(t => t.status !== "done").length}</span></button>`).join("") + `<div class="pop-sep"></div><button type="button" class="pop-item" data-add-planet><span class="dot" style="background:transparent;box-shadow:none;border:1px dashed var(--line-2)"></span><span class="lbl">+ 새 행성 만들기</span></button>`;
+  closePops() { const was = !this.popP.hidden || !this.popD.hidden; this.popP.hidden = this.popD.hidden = true; this.planetBtn.classList.remove("open"); this.dateBtn.classList.remove("open"); return was; },
+  renderPlanets() {
+    this.popP.innerHTML = `<div class="pop-title">어느 행성에 띄울까요</div>` + Store.planets().map(p => `<button type="button" class="pop-item" data-pid="${p.id}">${thumbImg(bodyKey(p), 30)}<span class="lbl">${U.esc(p.name)}</span><span class="sub">${Store.tasksOf(p.id).filter(t => t.status !== "done").length}</span>${p.id === this.planetId ? `<span class="chk">${ico("check", 16)}</span>` : ""}</button>`).join("")
+      + `<div class="pop-sep"></div><button type="button" class="pop-item" data-new>${ico("plus", 18)}<span class="lbl">새 행성 만들기</span></button>`;
   },
-  renderDatePop() {
+  renderDates() {
     const t = U.today(), opts = [["오늘", t], ["내일", U.addDays(t, 1)], ["모레", U.addDays(t, 2)], ["다음 주", U.addDays(t, 7)], ["기한 없음", ""]];
-    this.datePop.innerHTML = `<div class="pop-title">마감일</div><div class="pop-grid">${opts.map(([l, v]) => `<button type="button" class="pop-item ${(this.due || "") === v ? "sel" : ""}" data-due="${v}"><span class="lbl">${l}</span>${v ? `<span class="sub">${U.weekday(v)}</span>` : ""}</button>`).join("")}</div><div class="pop-sep"></div><div class="pop-row"><input type="date" id="qaDateInput" value="${this.due || ""}" aria-label="날짜"><input type="time" id="qaTimeInput" value="${this.time || ""}" aria-label="시간"></div>`;
+    this.popD.innerHTML = `<div class="pop-title">마감일</div><div class="pop-grid">${opts.map(([l, v]) => `<button type="button" class="pop-item" data-due="${v}"><span class="lbl">${l}</span>${v ? `<span class="sub">${U.weekday(v)}</span>` : ""}${(this.due || "") === v ? `<span class="chk">${ico("check", 15)}</span>` : ""}</button>`).join("")}</div><div class="pop-sep"></div><div class="pop-row"><input type="date" id="qaDate" value="${this.due || ""}" aria-label="날짜"><input type="time" id="qaTime" value="${this.time || ""}" aria-label="시간"></div>`;
   },
   submit() {
-    const parsed = U.parseQuick(this.input.value, Store.planets());
-    if (!parsed.title) { this.input.focus(); return; }
-    let due = parsed.due || this.due;
-    if (App.view === "calendar" && !parsed.due && Calendar.selected) due = Calendar.selected;
-    const data = { title: parsed.title, planetId: parsed.planetId || this.planetId, important: parsed.important, due, time: parsed.time || this.time || null };
+    const q = U.parseQuick(this.input.value, Store.planets()); if (!q.title) { this.input.focus(); return; }
+    let due = q.due || this.due;
+    if (App.view === "calendar" && !q.due && Calendar.selected) due = Calendar.selected;
+    const data = { title: q.title, planetId: q.planetId || this.planetId, important: q.important, due, time: q.time || this.time || null };
     if (App.view === "today" && !due) data.myDay = U.today();
+    const r = this.form.getBoundingClientRect(); Scene.launch = { x: r.left + 40, y: r.top + 8, t0: Scene.time };
     const t = Store.addTask(data); if (!t) return;
-    this.input.value = "";
+    this.input.value = ""; this.preview = null; this.paint();
     const p = Store.planet(t.planetId);
-    App.toast("🛰", `「${t.title}」 → ${p ? p.name : ""}${t.due ? ` · ${U.relDate(t.due)}` : ""}`);
-    if (App.view === "all" || (App.view === "today" && !Store.isTodayTask(t))) { if (App.view === "today") App.hint("오늘이 아닌 할 일은 「전체」 보기에서 볼 수 있어요", 4000); }
+    App.toast("orbit", `「${t.title}」 → ${p ? p.name : ""}${t.due ? ` · ${U.relDate(t.due)}` : ""}`);
+    if (App.view === "today" && !Store.isTodayTask(t)) setTimeout(() => App.toast("info", "오늘이 아닌 할 일은 「전체」에서 볼 수 있어요"), 500);
   },
 };
 
-/* ═══════════════ 검색 ═══════════════ */
-const Search = {
-  input: null, box: null, idx: -1,
+/* ═══════════════ 검색 팔레트 (/ 또는 Ctrl+K) ═══════════════ */
+const Palette = {
+  el: null, input: null, list: null, idx: 0, items: [],
   init() {
-    this.input = document.getElementById("searchInput"); this.box = document.getElementById("searchResults");
-    this.input.addEventListener("input", () => this.run());
-    this.input.addEventListener("focus", () => this.run());
+    this.el = $("#palette"); this.input = $("#palInput"); this.list = $("#palList");
+    this.el.addEventListener("click", e => { if (e.target.closest("[data-close]")) return this.close(); const it = e.target.closest(".pal-item"); if (it) this.pick(it.dataset.id); });
+    this.input.addEventListener("input", () => { this.idx = 0; this.run(); });
     this.input.addEventListener("keydown", e => {
-      const items = [...this.box.querySelectorAll(".search-item")];
-      if (e.key === "ArrowDown") { e.preventDefault(); this.idx = Math.min(items.length - 1, this.idx + 1); this.mark(items); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); this.idx = Math.max(0, this.idx - 1); this.mark(items); }
-      else if (e.key === "Enter") { e.preventDefault(); const it = items[Math.max(0, this.idx)]; if (it) { App.openTask(it.dataset.id); this.clear(); } }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const n = this.items.length; if (!n) return; this.idx = (this.idx + (e.key === "ArrowDown" ? 1 : -1) + n) % n; this.mark(); }
+      else if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); if (this.items[this.idx]) this.pick(this.items[this.idx]); }
     });
-    document.addEventListener("pointerdown", e => { if (!e.target.closest(".search-wrap")) this.box.hidden = true; }, true);
-    this.box.addEventListener("click", e => { const it = e.target.closest(".search-item"); if (it) { App.openTask(it.dataset.id); this.clear(); } });
   },
-  mark(items) { items.forEach((it, i) => it.classList.toggle("active", i === this.idx)); },
+  open() { this.el.hidden = false; this.input.value = ""; this.idx = 0; this.run(); requestAnimationFrame(() => this.input.focus()); },
+  close() { this.el.hidden = true; },
+  mark() { this.list.querySelectorAll(".pal-item").forEach((it, i) => { it.classList.toggle("active", i === this.idx); if (i === this.idx) it.scrollIntoView({ block: "nearest" }); }); },
   run() {
-    const q = this.input.value.trim().toLowerCase(); this.idx = -1;
-    Scene.setSearch(q); document.body.classList.toggle("searching", !!q);
-    if (!q) { this.box.hidden = true; return; }
-    const list = Store.tasks().filter(t => t.title.toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q)).sort(Store.sortTasks).slice(0, 10);
-    this.box.innerHTML = list.length ? list.map(t => { const p = Store.planet(t.planetId); return `<button type="button" class="search-item" data-id="${t.id}" style="--c:${p ? p.color : "#fff"}"><span class="dot"></span><span class="t ${t.status === "done" ? "done" : ""}">${U.esc(t.title)}</span><span class="m">${p ? U.esc(p.name) : ""}${t.due ? " · " + U.relDate(t.due) : ""}${t.status === "doing" ? " · 🔥" : ""}</span></button>`; }).join("") : `<div class="search-empty">「${U.esc(q)}」에 해당하는 할 일이 없어요</div>`;
-    this.box.hidden = false;
+    const q = this.input.value.trim().toLowerCase();
+    let list = q ? Store.tasks().filter(t => t.title.toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q)) : Store.todayTasks().filter(t => t.status !== "done");
+    list = list.sort(Store.sortTasks).slice(0, 14); this.items = list.map(t => t.id);
+    const hl = s => { if (!q) return U.esc(s); const i = s.toLowerCase().indexOf(q); return i < 0 ? U.esc(s) : U.esc(s.slice(0, i)) + "<mark>" + U.esc(s.slice(i, i + q.length)) + "</mark>" + U.esc(s.slice(i + q.length)); };
+    this.list.innerHTML = list.length ? (q ? "" : `<div class="pop-title">오늘 남은 할 일</div>`) + list.map((t, i) => {
+      const p = Store.planet(t.planetId);
+      return `<button type="button" class="pal-item ${i === this.idx ? "active" : ""}" data-id="${t.id}">${thumbImg(bodyKey(p), 26)}<span class="t ${t.status === "done" ? "done" : ""}">${hl(t.title)}</span><span class="m">${p ? U.esc(p.name) : ""}${t.due ? " · " + U.relDate(t.due) : ""}${t.status === "doing" ? " · 집중 중" : ""}</span></button>`;
+    }).join("") : `<div class="pal-empty">${q ? `「${U.esc(q)}」와 맞는 할 일이 없어요` : "오늘 남은 할 일이 없어요"}</div>`;
   },
-  clear() { this.input.value = ""; this.box.hidden = true; Scene.setSearch(""); document.body.classList.remove("searching"); this.input.blur(); },
+  pick(id) { this.close(); App.openTask(id); },
 };
 
-/* ═══════════════ 모달 ═══════════════ */
+/* ═══════════════ 모달: 설정 · 행성 편집 · 확인 ═══════════════ */
 const Modal = {
   el: null, card: null,
-  show(html) { this.el = this.el || document.getElementById("modal"); this.card = this.card || document.getElementById("modalCard"); this.card.innerHTML = html; this.el.hidden = false; const f = this.card.querySelector("input, select, button"); if (f) setTimeout(() => f.focus(), 30); },
+  show(html) { this.el = $("#modal"); this.card = $("#modalCard"); this.card.innerHTML = html; this.el.hidden = false; const f = this.card.querySelector("input[type=text]"); if (f) setTimeout(() => f.focus(), 40); },
   close() { if (this.el) this.el.hidden = true; },
-  confirm({ title, desc, ok = "확인", danger = false, onOk }) {
-    this.show(`<h3>${U.esc(title)}</h3><p class="desc">${desc}</p><div class="modal-actions"><button type="button" class="btn ghost" id="mCancel">취소</button><button type="button" class="btn ${danger ? "danger" : "primary"}" id="mOk">${U.esc(ok)}</button></div>`);
-    this.card.querySelector("#mCancel").addEventListener("click", () => this.close());
-    this.card.querySelector("#mOk").addEventListener("click", () => { this.close(); onOk(); });
+  confirm({ title, desc, ok, onOk }) {
+    this.show(`<h3>${U.esc(title)}</h3><p class="desc">${desc}</p><div class="m-actions"><button type="button" class="btn" data-x>취소</button><button type="button" class="btn danger" data-ok>${U.esc(ok)}</button></div>`);
+    this.card.querySelector("[data-x]").addEventListener("click", () => this.close());
+    this.card.querySelector("[data-ok]").addEventListener("click", () => { this.close(); onOk(); });
   },
   settings() {
-    const ps = Store.planets();
-    this.show(`<h3>행성 관리</h3><p class="desc">행성은 할 일의 카테고리예요. 색과 표면을 바꿔 나만의 태양계를 꾸며보세요.</p>
-      <div class="planet-list">${ps.map(p => { const n = Store.tasksOf(p.id).filter(t => t.status !== "done").length; return `<div class="planet-item" style="--c:${p.color}"><div class="planet look-${p.look || "plain"}"></div><div class="nm">${U.esc(p.emoji || "")} ${U.esc(p.name)}<small>남은 할 일 ${n}개</small></div><button type="button" class="btn small" data-edit="${p.id}">편집</button></div>`; }).join("")}</div>
-      <div class="settings-row" style="margin-top:10px"><button type="button" class="btn" id="mAddPlanet">+ 행성 추가</button></div>
-      <div class="hr"></div>
-      <h3 style="font-size:16px">앱으로 사용하기</h3>
-      <p class="desc" style="margin-bottom:8px">${App.installPrompt ? "홈 화면이나 바탕화면에 설치하면 전체 화면 앱처럼 열려요." : /iPhone|iPad|iPod/.test(navigator.userAgent) ? "Safari 하단 <b>공유</b> 버튼 → <b>홈 화면에 추가</b>를 누르면 앱처럼 설치돼요." : /Android/.test(navigator.userAgent) ? "브라우저 메뉴(⋮)에서 <b>홈 화면에 추가</b> 또는 <b>앱 설치</b>를 누르세요." : "Chrome/Edge 주소창 오른쪽의 <b>설치</b> 아이콘으로 데스크톱 앱처럼 설치할 수 있어요. (https 로 열었을 때)"}</p>
-      ${App.installPrompt ? `<div class="settings-row"><button type="button" class="btn primary small" id="mInstall">📲 앱으로 설치</button></div>` : ""}
-      <div class="hr"></div>
-      <h3 style="font-size:16px">데이터</h3>
-      <div class="settings-row"><button type="button" class="btn small" id="mExport">JSON 내보내기</button><button type="button" class="btn small" id="mCopy">클립보드로 복사</button><label class="btn small" for="mImportFile">JSON 가져오기</label><input type="file" id="mImportFile" accept="application/json,.json" hidden></div>
-      <div class="settings-row"><button type="button" class="btn small" id="mSample">예시 데이터로 시작</button><button type="button" class="btn small danger" id="mReset">모두 지우기</button></div>
-      <div class="hr"></div>
-      <p class="desc" style="margin:0">단축키 · <kbd>N</kbd> 새 할 일 · <kbd>/</kbd> 검색 · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 보기 전환 · <kbd>T</kbd> 오늘의 미션 · <kbd>Esc</kbd> 닫기<br>입력 팁 · <code>#행성</code> 으로 행성 지정, <code>!</code> 로 중요, 「내일」「다음주 금요일」「오후 3시」「12/25」 같은 날짜와 시간을 알아들어요.</p>
-      <div class="modal-actions"><button type="button" class="btn ghost" id="mClose">닫기</button></div>`);
-    const c = this.card;
+    const ps = Store.planets(), ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua), android = /Android/.test(ua);
+    const how = App.installPrompt ? "바탕화면이나 홈 화면에 설치하면 전체 화면 앱처럼 열려요."
+      : ios ? "Safari 아래쪽 공유 버튼에서 「홈 화면에 추가」를 누르면 앱처럼 설치돼요."
+      : android ? "브라우저 메뉴(⋮)에서 「홈 화면에 추가」 또는 「앱 설치」를 누르세요."
+      : "Chrome이나 Edge 주소창 오른쪽의 설치 아이콘으로 데스크톱 앱처럼 설치할 수 있어요. https 주소로 열었을 때 동작해요.";
+    this.show(`<h3>설정</h3><p class="desc">행성은 할 일의 카테고리예요. 실제 천체 사진으로 나만의 태양계를 꾸며 보세요.</p>
+      <h4>행성</h4>
+      <div class="plist">${ps.map(p => `<div class="pitem">${thumbImg(bodyKey(p), 38)}<div class="nm">${U.esc(p.name)}<small>${bodyOf(p).ko} · 남은 할 일 ${Store.tasksOf(p.id).filter(t => t.status !== "done").length}개</small></div><button type="button" class="btn sm" data-edit="${p.id}">편집</button></div>`).join("")}</div>
+      <div class="btn-row" style="margin-top:10px"><button type="button" class="btn sm" id="mAdd">${ico("plus", 15)}행성 추가</button></div>
+      <h4>앱으로 쓰기</h4><p class="desc" style="margin:0 0 10px">${how}</p>${App.installPrompt ? `<div class="btn-row"><button type="button" class="btn sol sm" id="mInstall">${ico("install", 15)}앱으로 설치</button></div>` : ""}
+      <h4>데이터</h4>
+      <div class="btn-row"><button type="button" class="btn sm" id="mExport">${ico("download", 15)}JSON 내보내기</button><button type="button" class="btn sm" id="mCopy">${ico("copy", 15)}복사</button><label class="btn sm" for="mFile">${ico("upload", 15)}가져오기</label><input type="file" id="mFile" accept="application/json,.json" hidden></div>
+      <div class="btn-row" style="margin-top:8px"><button type="button" class="btn sm" id="mSample">예시 데이터로 시작</button><button type="button" class="btn sm danger" id="mReset">모두 지우기</button></div>
+      <h4>단축키</h4>
+      <div class="keys"><kbd>N</kbd><span>새 할 일</span><kbd>/</kbd><span>검색 (Ctrl+K)</span><kbd>1 2 3</kbd><span>오늘 · 전체 · 캘린더</span><kbd>T</kbd><span>오늘의 미션</span><kbd>Esc</kbd><span>닫기</span></div>
+      <p class="desc" style="margin:12px 0 0">입력 팁: <b>#행성이름</b>으로 행성을, <b>!</b>로 중요를 지정해요. 「내일」「다음주 금요일」「오후 3시」「12/25」 같은 날짜와 시간도 알아들어요.</p>
+      <h4>이미지 출처</h4>
+      <p class="credits">행성·태양·은하수 텍스처는 <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>의 자료(CC BY 4.0)예요. NASA 탐사선과 관측 자료를 바탕으로 만든 지도입니다.</p>
+      <div class="m-actions"><button type="button" class="btn" id="mClose">닫기</button></div>`);
+    const c = this.card, on = (s, f) => { const el = c.querySelector(s); if (el) el.addEventListener("click", f); };
     c.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => this.planet(b.dataset.edit)));
-    c.querySelector("#mAddPlanet").addEventListener("click", () => this.planet(null));
-    c.querySelector("#mClose").addEventListener("click", () => this.close());
-    const inst = c.querySelector("#mInstall"); if (inst) inst.addEventListener("click", async () => { const p = App.installPrompt; if (!p) return; p.prompt(); try { await p.userChoice; } catch (e) {} App.installPrompt = null; this.close(); });
-    c.querySelector("#mExport").addEventListener("click", () => {
-      try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([Store.exportJSON()], { type: "application/json" })); a.download = `orbit-todo-${U.today()}.json`; a.click(); App.toast("📦", "JSON 파일로 내보냈어요"); } catch (e) { App.toast("⚠", "내보내기에 실패했어요. 클립보드 복사를 이용해 주세요"); }
+    on("#mAdd", () => this.planet(null)); on("#mClose", () => this.close());
+    on("#mInstall", async () => { const p = App.installPrompt; if (!p) return; p.prompt(); try { await p.userChoice; } catch (e) { /* 무시 */ } App.installPrompt = null; this.close(); });
+    on("#mExport", () => { try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([Store.exportJSON()], { type: "application/json" })); a.download = `orbit-todo-${U.today()}.json`; a.click(); App.toast("download", "JSON 파일로 내보냈어요"); } catch (e) { App.toast("alert", "내보내지 못했어요. 복사를 이용해 주세요"); } });
+    on("#mCopy", () => { navigator.clipboard.writeText(Store.exportJSON()).then(() => App.toast("copy", "클립보드에 복사했어요")).catch(() => App.toast("alert", "복사할 수 없는 환경이에요")); });
+    c.querySelector("#mFile").addEventListener("change", e => {
+      const f = e.target.files[0]; if (!f) return; const r = new FileReader();
+      r.onload = () => { try { Store.importJSON(r.result); this.close(); App.toast("upload", "데이터를 가져왔어요"); } catch (err) { App.toast("alert", `가져오지 못했어요: ${err.message}`); } };
+      r.readAsText(f);
     });
-    c.querySelector("#mCopy").addEventListener("click", () => { navigator.clipboard.writeText(Store.exportJSON()).then(() => App.toast("📋", "클립보드에 복사했어요")).catch(() => App.toast("⚠", "복사할 수 없어요")); });
-    c.querySelector("#mImportFile").addEventListener("change", e => {
-      const f = e.target.files[0]; if (!f) return;
-      const r = new FileReader(); r.onload = () => { try { Store.importJSON(r.result); this.close(); App.toast("📥", "데이터를 가져왔어요"); } catch (err) { App.toast("⚠", `가져오기 실패: ${err.message}`); } }; r.readAsText(f);
-    });
-    c.querySelector("#mSample").addEventListener("click", () => this.confirm({ title: "예시 데이터로 시작", desc: "현재 데이터를 모두 지우고 예시 행성과 할 일로 바꿉니다.", ok: "바꾸기", danger: true, onOk: () => { Store.reset(true); App.toast("✨", "예시 데이터를 불러왔어요"); } }));
-    c.querySelector("#mReset").addEventListener("click", () => this.confirm({ title: "모두 지우기", desc: "모든 행성과 할 일이 삭제됩니다. 되돌릴 수 없어요.", ok: "모두 지우기", danger: true, onOk: () => { Store.reset(false); App.toast("🌌", "빈 우주에서 다시 시작해요"); } }));
+    on("#mSample", () => this.confirm({ title: "예시 데이터로 시작", desc: "지금 데이터를 모두 지우고 예시 행성과 할 일로 바꿔요.", ok: "바꾸기", onOk: () => { Store.reset(true); App.toast("sparkle", "예시 데이터를 불러왔어요"); } }));
+    on("#mReset", () => this.confirm({ title: "모두 지우기", desc: "모든 행성과 할 일이 지워지고 되돌릴 수 없어요.", ok: "모두 지우기", onOk: () => { Store.reset(false); App.toast("orbit", "빈 우주에서 다시 시작해요"); } }));
   },
-
-  /* 행성 편집기 */
   planet(id) {
-    const existing = id ? Store.planet(id) : null;
-    const used = Store.planets().map(p => p.color);
-    const draft = existing ? { ...existing } : { name: "", emoji: "🪐", color: Store.COLORS.find(c => !used.includes(c)) || Store.COLORS[Store.planets().length % Store.COLORS.length], look: ["plain", "banded", "ringed", "rocky", "icy"][Store.planets().length % 5] };
-    const emojis = ["💼", "📚", "🏃", "🏠", "🎨", "💡", "🛒", "❤️", "✈️", "🎮", "💰", "🧪", "🎵", "🌱", "🪐"];
-    this.show(`<h3>${existing ? "행성 편집" : "새 행성"}</h3><p class="desc">${existing ? "이름, 색, 표면을 바꿀 수 있어요." : "새 카테고리가 태양 주위에 새 행성으로 나타나요."}</p>
-      <div class="form-grid">
-        <div class="form-row"><label class="field-label" for="pName" style="margin:9px 0 0">이름</label><input type="text" id="pName" value="${U.esc(draft.name)}" placeholder="예: 업무, 공부, 건강" maxlength="14"></div>
-        <div class="form-row"><label class="field-label" for="pEmoji" style="margin:9px 0 0">이모지</label><div><input type="text" id="pEmoji" value="${U.esc(draft.emoji || "")}" maxlength="4" style="width:80px"><div class="swatches" style="margin-top:8px">${emojis.map(e => `<button type="button" class="pill" data-emoji="${e}">${e}</button>`).join("")}</div></div></div>
-        <div class="form-row"><span class="field-label" style="margin:6px 0 0">색상</span><div class="swatches">${Store.COLORS.map(c => `<button type="button" class="swatch ${c === draft.color ? "on" : ""}" data-color="${c}" style="--c:${c}" aria-label="${c}"></button>`).join("")}</div></div>
-        <div class="form-row"><span class="field-label" style="margin:12px 0 0">표면</span><div class="looks">${Store.LOOKS.map(([v, l]) => `<button type="button" class="look-opt ${v === draft.look ? "on" : ""}" data-look="${v}"><div class="planet look-${v}" style="--c:${draft.color}"></div>${l}</button>`).join("")}</div></div>
-      </div>
-      <div class="modal-actions">${existing && Store.planets().length > 1 ? `<button type="button" class="btn ghost danger left" id="pDelete">행성 삭제</button>` : ""}<button type="button" class="btn ghost" id="pCancel">취소</button><button type="button" class="btn primary" id="pSave">${existing ? "저장" : "행성 만들기"}</button></div>`);
+    const ex = id ? Store.planet(id) : null, used = new Set(Store.planets().filter(p => !ex || p.id !== ex.id).map(p => p.body));
+    let body = ex ? bodyKey(ex) : Store.freeBody();
+    this.show(`<h3>${ex ? "행성 편집" : "새 행성"}</h3><p class="desc">${ex ? "이름과 천체를 바꿀 수 있어요." : "새 카테고리가 태양 주위에 새 행성으로 떠올라요."}</p>
+      <input type="text" id="pName" value="${U.esc(ex ? ex.name : "")}" placeholder="예: 업무, 공부, 건강" maxlength="14" aria-label="행성 이름">
+      <h4>천체 고르기</h4>
+      <div class="bodies">${BODY_ORDER.map(k => { const b = BODIES[k]; return `<button type="button" class="body-opt ${k === body ? "on" : ""} ${used.has(k) ? "used" : ""}" data-body="${k}" style="--c:${b.color}" aria-pressed="${k === body}">${thumbImg(k, 60)}<span class="ko">${b.ko}</span><span class="en">${b.en.toUpperCase()}</span></button>`; }).join("")}</div>
+      <div class="m-actions">${ex && Store.planets().length > 1 ? `<button type="button" class="btn danger left" id="pDel">${ico("trash", 15)}삭제</button>` : ""}<button type="button" class="btn" id="pCancel">취소</button><button type="button" class="btn sol" id="pSave">${ex ? "저장" : "행성 만들기"}</button></div>`);
     const c = this.card;
-    c.querySelectorAll("[data-emoji]").forEach(b => b.addEventListener("click", () => { c.querySelector("#pEmoji").value = b.dataset.emoji; }));
-    c.querySelectorAll("[data-color]").forEach(b => b.addEventListener("click", () => { draft.color = b.dataset.color; c.querySelectorAll("[data-color]").forEach(x => x.classList.toggle("on", x === b)); c.querySelectorAll(".look-opt .planet").forEach(x => x.style.setProperty("--c", draft.color)); }));
-    c.querySelectorAll("[data-look]").forEach(b => b.addEventListener("click", () => { draft.look = b.dataset.look; c.querySelectorAll("[data-look]").forEach(x => x.classList.toggle("on", x === b)); }));
+    c.querySelectorAll("[data-body]").forEach(b => b.addEventListener("click", () => { body = b.dataset.body; c.querySelectorAll("[data-body]").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b); }); }));
     const save = () => {
       const name = c.querySelector("#pName").value.trim(); if (!name) { c.querySelector("#pName").focus(); return; }
-      const data = { name, emoji: c.querySelector("#pEmoji").value.trim(), color: draft.color, look: draft.look };
-      if (existing) { Store.updatePlanet(existing.id, data); App.toast("🪐", `「${name}」 행성을 수정했어요`); }
-      else { const p = Store.addPlanet(data); QuickAdd.setPlanet(p.id); App.toast("🪐", `「${name}」 행성이 태어났어요`); }
+      if (ex) { Store.updatePlanet(ex.id, { name, body }); App.toast("orbit", `「${name}」 행성을 수정했어요`); }
+      else { const p = Store.addPlanet({ name, body }); QuickAdd.planetId = p.id; QuickAdd.paint(); App.toast("sparkle", `「${name}」 행성이 태어났어요`); }
       this.close();
     };
     c.querySelector("#pSave").addEventListener("click", save);
-    c.querySelector("#pName").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); save(); } });
+    c.querySelector("#pName").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); save(); } });
     c.querySelector("#pCancel").addEventListener("click", () => this.close());
-    const del = c.querySelector("#pDelete"); if (del) del.addEventListener("click", () => this.deletePlanet(existing.id));
+    const del = c.querySelector("#pDel"); if (del) del.addEventListener("click", () => this.deletePlanet(ex.id));
   },
   deletePlanet(id) {
     const p = Store.planet(id), others = Store.planets().filter(x => x.id !== id), n = Store.tasksOf(id).length;
-    this.show(`<h3>「${U.esc(p.name)}」 행성 삭제</h3><p class="desc">${n ? `이 행성에는 할 일이 ${n}개 있어요. 어떻게 할까요?` : "이 행성에는 할 일이 없어요."}</p>
-      ${n ? `<div class="form-grid"><label class="pill on" style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:12px;cursor:pointer"><input type="radio" name="pdel" value="move" checked> 다른 행성으로 옮기기 <select id="pMoveTo" style="width:auto;margin-left:auto">${others.map(o => `<option value="${o.id}">${U.esc(o.emoji || "")} ${U.esc(o.name)}</option>`).join("")}</select></label><label class="pill" style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:12px;cursor:pointer"><input type="radio" name="pdel" value="del"> 할 일도 함께 삭제</label></div>` : ""}
-      <div class="modal-actions"><button type="button" class="btn ghost" id="pdCancel">취소</button><button type="button" class="btn danger" id="pdOk">삭제</button></div>`);
+    this.show(`<h3>「${U.esc(p.name)}」 행성 삭제</h3><p class="desc">${n ? `이 행성에 할 일이 ${n}개 있어요. 어떻게 할까요?` : "이 행성에는 할 일이 없어요."}</p>
+      ${n ? `<label class="radio-row"><input type="radio" name="pdel" value="move" checked>다른 행성으로 옮기기<select id="pMoveTo" class="field-input">${others.map(o => `<option value="${o.id}">${U.esc(o.name)}</option>`).join("")}</select></label><label class="radio-row"><input type="radio" name="pdel" value="del">할 일도 함께 삭제</label>` : ""}
+      <div class="m-actions"><button type="button" class="btn" id="dCancel">취소</button><button type="button" class="btn danger" id="dOk">삭제</button></div>`);
     const c = this.card;
-    c.querySelector("#pdCancel").addEventListener("click", () => this.close());
-    c.querySelector("#pdOk").addEventListener("click", () => {
-      const mode = n ? c.querySelector("input[name=pdel]:checked").value : "del";
-      const to = mode === "move" ? c.querySelector("#pMoveTo").value : null;
+    c.querySelector("#dCancel").addEventListener("click", () => this.close());
+    c.querySelector("#dOk").addEventListener("click", () => {
+      const mode = n ? c.querySelector("input[name=pdel]:checked").value : "del", to = mode === "move" ? c.querySelector("#pMoveTo").value : null;
       if (Panel.mode === "planet" && Panel.id === id) Panel.close();
-      Store.removePlanet(id, to); this.close(); App.toast("🌑", `「${p.name}」 행성이 사라졌어요`);
+      Store.removePlanet(id, to); this.close(); App.toast("orbit", `「${p.name}」 행성이 사라졌어요`);
     });
   },
 };
 
-document.addEventListener("DOMContentLoaded", () => App.init());
-
-/* ═══════════════ PWA: 설치 프롬프트 + 서비스 워커 ═══════════════ */
+/* ═══════════════ PWA: 설치 · 서비스 워커 ═══════════════ */
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); App.installPrompt = e; });
-window.addEventListener("appinstalled", () => { App.installPrompt = null; App.toast("📲", "앱으로 설치됐어요"); });
+window.addEventListener("appinstalled", () => { App.installPrompt = null; App.toast("install", "앱으로 설치됐어요"); });
 if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
   window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => { /* 호스팅 환경에서만 동작 */ }); });
 }
+document.addEventListener("DOMContentLoaded", () => App.init());
