@@ -10,7 +10,7 @@ const Scene = {
   systems: new Map(), order: [], orbs: new Map(), hover: null, drag: null, carousel: 0, spin: 1,
   par: { x: 0, y: 0, tx: 0, ty: 0 }, narrow: false, touch: false, reduced: false, panelOpen: false, area: null,
   lastPos: new Map(), launch: null, q: 1, perf: { ema: 1 / 60, t: 0 }, idleAt: 0,
-  SHELL_CAP: [6, 9, 12, 16, 22], HOLD: 380, nowH: 0,
+  SHELL_CAP: [6, 9, 12, 16, 22], HOLD: 380, DBL: 330, nowH: 0,
   v3d: { az: 0, el: 0, zoom: 1, taz: 0, tel: 0, tzoom: 1 }, focusId: null, fRef: null, ft: 0, autoRotate: true, orbitDrag: null, pinch: null, ptrs: new Map(),
 
   init() {
@@ -56,7 +56,7 @@ const Scene = {
   },
   orbitR(i) { return this.narrow ? 6.6 + i * 2.05 : 9 + i * 2.7; },
   shellR(s, i) { return s.R * (this.narrow ? 1.55 : 1.7) + 0.25 + i * (this.narrow ? 0.62 : 0.62); },
-  moonR(t) { return ([0.24, 0.32, 0.27, 0.22][t.priority || 0]) * (this.narrow ? 1.45 : 1) * (this.touch ? 1.1 : 1); },
+  moonR(t) { return ([0.24, 0.32, 0.27, 0.22][t.priority || 0]) * (this.narrow ? 1.45 : 1.12) * (this.touch ? 1.1 : 1); },
   layout() {
     const burning = this.orbs.size > 0, n = this.order.length;
     const top = this.narrow ? 124 : 92, bottom = this.H - (this.narrow ? 84 : 100) - (burning ? this.nowH : 0);
@@ -134,8 +134,13 @@ const Scene = {
       s.shells = list.length ? this.shellOf(list.length - 1) + 1 : 0;
       const fire = doing.filter(t => t.planetId === s.id).length, late = list.filter(m => Store.isOverdue(m.task)).length, high = list.filter(m => m.task.priority === 1).length;
       s.metaEl.innerHTML = `<span>할 일 ${list.length}</span>${high ? `<span class="m-high">높음 ${high}</span>` : ""}${fire ? `<span class="m-fire">집중 ${fire}</span>` : ""}${late ? `<span class="m-late">지남 ${late}</span>` : ""}`;
-      s.label.classList.toggle("empty", !list.length && !fire); s.lm = 0;
-      s.label.setAttribute("aria-label", `${s.planet.name} 행성, 할 일 ${list.length}개. 열기`);
+      const max = this.narrow ? 2 : 3, open = list.map(m => m.task).sort(Store.sortTasks), rows = open.slice(0, max);
+      s.listEl.innerHTML = rows.map(t => {
+        const late = Store.isOverdue(t), side = late ? `<span class="pl-d late">지남</span>` : t.time && t.due === U.today() ? `<span class="pl-d">${U.fmtTime(t.time)}</span>` : "";
+        return `<div class="pl-row ${t.priority ? "p" + t.priority : ""}" data-id="${t.id}" role="button" tabindex="0" aria-label="${U.esc(t.title)}"><i aria-hidden="true"></i><span class="tt">${U.esc(t.title)}</span>${side}</div>`;
+      }).join("") + (open.length > max ? `<button type="button" class="pl-more">+${open.length - max}개 더</button>` : "");
+      s.label.classList.toggle("empty", !list.length && !fire); s.label.classList.toggle("has-list", rows.length > 0); s.lm = 0;
+      s.headEl.setAttribute("aria-label", `${s.planet.name} 행성, 할 일 ${list.length}개. 열기`);
     }
     const dset = new Set(doing.map(t => t.id));
     for (const [tid, o] of this.orbs) if (!dset.has(tid)) { if (d.type === "task-complete" && d.id === tid) this.burstAt(o.sx, o.sy, "#ffc070", true); this.orbs.delete(tid); }
@@ -151,16 +156,23 @@ const Scene = {
     return p && this.time - p.t0 < 2 ? { x: p.x, y: p.y, t0: this.time, p: null } : null;
   },
   makeSystem(p) {
-    const el = document.createElement("button");
-    el.type = "button"; el.className = "p-label"; el.dataset.id = p.id;
-    el.innerHTML = `<span class="pl-lead" aria-hidden="true"></span><span class="pl-box"><span class="pl-name"></span><span class="pl-meta"></span></span>`;
-    el.addEventListener("click", () => App.openPlanet(p.id));
+    const el = document.createElement("div");
+    el.className = "p-label"; el.dataset.id = p.id;
+    el.innerHTML = `<span class="pl-lead" aria-hidden="true"></span><div class="pl-box"><button type="button" class="pl-head"><span class="pl-name"></span><span class="pl-meta"></span></button><div class="pl-list"></div></div>`;
+    el.querySelector(".pl-head").addEventListener("click", () => App.openPlanet(p.id));
+    /* 이름표 속 할 일 줄: 위성과 똑같이 클릭은 열기, 두 번 클릭·꾹 누르기는 잡기 */
+    const lst = el.querySelector(".pl-list");
+    lst.addEventListener("pointerdown", e => { const row = e.target.closest(".pl-row"); if (!row) return; e.stopPropagation(); this.startPending(e, { kind: "moon", id: row.dataset.id, sysId: p.id }); });
+    lst.addEventListener("click", e => { if (e.target.closest(".pl-more")) App.openPlanet(p.id); });
+    lst.addEventListener("keydown", e => { const row = e.target.closest(".pl-row"); if (row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); App.openTask(row.dataset.id); } });
+    lst.addEventListener("pointerover", e => { const row = e.target.closest(".pl-row"); if (row && e.pointerType === "mouse" && !this.drag) this.listHover = row.dataset.id; });
+    lst.addEventListener("pointerout", e => { const row = e.target.closest(".pl-row"); if (row && !row.contains(e.relatedTarget) && this.listHover === row.dataset.id) this.listHover = null; });
     el.addEventListener("pointerenter", () => { const s = this.systems.get(p.id); if (s) s.labelHover = true; });
     el.addEventListener("pointerleave", () => { const s = this.systems.get(p.id); if (s) s.labelHover = false; });
     this.labels.appendChild(el);
     const sd = k => this.seed(p.id, k);
     const s = {
-      id: p.id, planet: p, body: bodyOf(p), key: bodyKey(p), label: el, nameEl: el.querySelector(".pl-name"), metaEl: el.querySelector(".pl-meta"),
+      id: p.id, planet: p, body: bodyOf(p), key: bodyKey(p), label: el, headEl: el.querySelector(".pl-head"), listEl: lst, nameEl: el.querySelector(".pl-name"), metaEl: el.querySelector(".pl-meta"),
       moons: new Map(), shells: 0, orbit: 8, ang0: 0, R: 0.8, p: [0, 0, 0], h: 0, hover: false, labelHover: false, pinned: false,
       bob: [sd(1) * 6.28, 0.35 + sd(2) * 0.25, sd(3) * 6.28], incl: 0.32 + sd(4) * 0.4, node: sd(5) * Math.PI * 2, rot0: sd(6) * Math.PI * 2,
       sx: 0, sy: 0, sr: 10, w: 1, ext: 40, n: [0, 1, 0], u: [1, 0, 0], v: [0, 0, 1], born: this.time,
@@ -187,7 +199,8 @@ const Scene = {
   updateHint() {
     const el = this.hint, d = this.drag && !this.drag.pending ? this.drag : null;
     let txt = "", sub = "";
-    if (d) { txt = d.kind === "orb" ? "행성에 놓으면 궤도로 돌아가요" : d.sunTarget ? "놓으면 점화돼요" : "태양에 놓으면 집중을 시작해요"; sub = d.kind === "orb" ? "타이머는 일시정지돼요" : "다른 행성에 놓으면 카테고리가 바뀌어요"; }
+    if (d && d.sticky) { const tap = this.touch ? "탭" : "클릭"; txt = d.sunTarget ? `${tap}하면 점화돼요` : d.target ? `${tap}하면 ${d.target.planet.name}${U.josa(d.target.planet.name, "으로", "로")} 옮겨요` : `놓을 곳을 ${tap}하세요`; sub = d.kind === "orb" ? "행성: 궤도로 복귀 · 빈 곳: 취소" : `태양: 집중 · 다른 행성: 이동 · 빈 곳${this.touch ? "" : "이나 Esc"}: 취소`; }
+    else if (d) { txt = d.kind === "orb" ? "행성에 놓으면 궤도로 돌아가요" : d.sunTarget ? "놓으면 점화돼요" : "태양에 놓으면 집중을 시작해요"; sub = d.kind === "orb" ? "타이머는 일시정지돼요" : "다른 행성에 놓으면 카테고리가 바뀌어요"; }
     else if (!this.orbs.size && !this.focusId) {
       const any = [...this.systems.values()].some(s => s.moons.size);
       txt = any ? "위성을 태양으로 끌어 오세요" : (this.view === "today" ? "오늘 남은 할 일이 없어요" : "할 일이 없어요");
@@ -351,9 +364,8 @@ const Scene = {
   placeDom() {
     const W = this.W, near = Math.min(...[...this.systems.values()].map(s => s.w)), far = Math.max(...[...this.systems.values()].map(s => s.w));
     for (const s of this.systems.values()) {
-      const flip = s.sx > W - 210 && s.sx > W / 2, k = 0.72, ax = s.sx + (flip ? -1 : 1) * s.sr * k, ay = s.sy - s.sr * k;
-      s.label.classList.toggle("flip", flip); s.label.classList.toggle("hot", s.h > 0.5 || (this.listHover && s.moons.has(this.listHover))); s.label.classList.toggle("hid", s.hidden || (s.id === this.focusId && this.fe > 0.5));
-      s.label.style.transform = `translate3d(${ax.toFixed(1)}px, ${ay.toFixed(1)}px, 0)`;
+      s.pref = [s.sx > W - 210 && s.sx > W / 2, s.lh > 0 && s.sy - s.sr * 0.72 - 14 - s.lh < this.area.top - 20];
+      s.label.classList.toggle("hot", s.h > 0.5 || (this.listHover && s.moons.has(this.listHover))); s.label.classList.toggle("hid", s.hidden || (s.id === this.focusId && this.fe > 0.5));
       const depth = far > near ? (s.w - near) / (far - near) : 0, other = this.focusId && s.id !== this.focusId;
       s.label.style.setProperty("--dim", (other ? 0.32 : 1 - depth * 0.35).toFixed(2));
     }
@@ -373,18 +385,48 @@ const Scene = {
   },
   /* 라벨이 겹치면 가까운 행성·강조된 행성을 먼저 살리고, 나머지는 이름만 남기거나 숨긴다 */
   cullLabels() {
-    const placed = [], hit = (a, b) => a[0] < b[2] + 4 && a[2] + 4 > b[0] && a[1] < b[3] + 2 && a[3] + 2 > b[1];
+    /* 단계: 0 할 일 줄까지 · 1 이름과 개수 · 2 이름만 · 3 숨김.
+       방향(오른쪽 위 → 아래 → 왼쪽)을 바꿔 가며 겹치지 않는 가장 자세한 단계를 고른다. 지난 프레임 방향을 먼저 써서 깜박임을 막는다 */
+    const placed = [], hit = (a, b) => a[0] < b[2] + 4 && a[2] + 4 > b[0] && a[1] < b[3] + 2 && a[3] + 2 > b[1], W = this.W, A = this.area;
+    const sun = this.sun, discs = [[sun.sx - sun.sr * 1.1, sun.sy - sun.sr * 1.1, sun.sx + sun.sr * 1.1, sun.sy + sun.sr * 1.1, "sun"]];
+    for (const o of this.systems.values()) if (!o.hidden) discs.push([o.sx - o.sr, o.sy - o.sr, o.sx + o.sr, o.sy + o.sr, o.id]);
+    /* 화면 위에 떠 있는 UI(보드 · 시점 버튼 · 집중 바)는 1초마다 다시 재서 이름표가 그 밑으로 숨지 않게 한다 */
+    if (!this._obT || this.time - this._obT > 1) {
+      this._obT = this.time;
+      this._ob = ["board", "boardPill", "viewCtl", "nowbar", "focusChip"].map(id => document.getElementById(id)).filter(el => el && !el.hidden).map(el => el.getBoundingClientRect()).filter(q => q.width > 0).map(q => [q.left, q.top, q.right, q.bottom]);
+    }
+    placed.push(...this._ob);
+    const anchor = (s, f, d) => [s.sx + (f ? -1 : 1) * s.sr * 0.72, s.sy + (d ? 1 : -1) * s.sr * 0.72];
+    const rect = (s, f, d, w, h) => { const [ax, ay] = anchor(s, f, d), x0 = f ? ax - 14 - w : ax + 14, y0 = d ? ay + 14 : ay - 14 - h; return [x0, y0, x0 + w, y0 + h]; };
     const list = [...this.systems.values()].sort((a, b) => ((b.h > 0.5) - (a.h > 0.5)) || ((b.id === this.focusId) - (a.id === this.focusId)) || (a.w - b.w));
     for (const s of list) {
-      if (!s.lm) { const box = s.label.querySelector(".pl-box"); s.lw = box.offsetWidth; s.lh = box.offsetHeight; s.cw = s.nameEl.offsetWidth + 8; s.lm = 1; }
-      const off = s.label.classList.contains("hid");
-      if (off) { s.label.classList.remove("compact", "cull"); continue; }
-      const flip = s.label.classList.contains("flip"), k = 0.72, ax = s.sx + (flip ? -1 : 1) * s.sr * k, ay = s.sy - s.sr * k;
-      const rect = (w, h) => flip ? [ax - 14 - w, ay - 14 - h, ax - 14, ay - 14] : [ax + 14, ay - 14 - h, ax + 14 + w, ay - 14];
-      const full = rect(s.lw, s.lh), comp = rect(s.cw, 18);
-      let mode = 0; if (placed.some(r => hit(r, full))) mode = placed.some(r => hit(r, comp)) ? 2 : 1;
-      if (mode < 2) placed.push(mode ? comp : full);
-      s.label.classList.toggle("compact", mode === 1); s.label.classList.toggle("cull", mode === 2);
+      if (!s.lm) {
+        const L = s.label, keep = ["compact", "cull", "sum"].filter(c => L.classList.contains(c)); L.classList.remove(...keep);
+        const box = L.querySelector(".pl-box"); s.lw = box.offsetWidth; s.lh = box.offsetHeight; s.sw = s.headEl.offsetWidth + 8; s.sh = s.headEl.offsetHeight + 6; s.cw = s.nameEl.offsetWidth + 8; s.lm = 1;
+        L.classList.add(...keep);
+      }
+      const pref = s.pref || [false, false], [pf, pd] = pref;
+      const oris = [[pf, pd], [pf, !pd], [!pf, pd], [!pf, !pd]]; if (s.ori) oris.unshift(s.ori);
+      let mode = 3, ori = s.ori || pref, box = null;
+      if (!s.label.classList.contains("hid")) {
+        const other = this.focusId && s.id !== this.focusId, hasList = s.label.classList.contains("has-list");
+        const tries = [[0, s.lw, s.lh], [1, s.sw, s.sh], [2, s.cw, 18]];
+        search: for (const [m, w, h] of tries) {
+          if (m === 0 && (!hasList || other)) continue;
+          for (const [f, d] of oris) {
+            const q = rect(s, f, d, w, h);
+            if (m === 0 ? !(q[0] > 4 && q[2] < W - 4 && q[1] > A.top - 24 && q[3] < A.bottom + 30) : !(q[0] > -8 && q[2] < W + 8 && q[1] > 36)) continue;
+            if (placed.some(p => hit(p, q))) continue;
+            if (m === 0 && discs.some(p => p[4] !== s.id && hit(p, q))) continue;
+            mode = m; ori = [f, d]; box = q; break search;
+          }
+        }
+        if (box) { placed.push(box); s.ori = ori; }
+      } else { ori = pref; s.ori = null; mode = -1; }
+      const [ax, ay] = anchor(s, ori[0], ori[1]);
+      s.label.style.transform = `translate3d(${ax.toFixed(1)}px, ${ay.toFixed(1)}px, 0)`;
+      s.label.classList.toggle("flip", ori[0]); s.label.classList.toggle("down", ori[1]);
+      s.label.classList.toggle("sum", mode === 1); s.label.classList.toggle("compact", mode === 2); s.label.classList.toggle("cull", mode === 3);
     }
   },
   /* 위성 옆 할 일 이름: 행성에 올렸을 때(또는 설정에서 항상) 보여 준다 */
@@ -513,7 +555,7 @@ const Scene = {
     if (t.priority) meta.push(`<span style="color:${PRIO[t.priority].color}">${prioSvg(t.priority, 12)}${PRIO[t.priority].ko}</span>`);
     if (t.steps.length) meta.push(`<span>${ico("list", 12)}${t.steps.filter(s => s.done).length}/${t.steps.length}</span>`);
     if (t.repeat && t.repeat !== "none") meta.push(`<span>${ico("repeat", 12)}반복</span>`);
-    this.tip.innerHTML = `<div class="tt-top"><i style="--c:${p ? pColor(p) : "#fff"}"></i>${U.esc(p ? p.name : "")}</div><div class="tt-title">${U.esc(t.title)}</div>${meta.length ? `<div class="tt-meta">${meta.join("")}</div>` : ""}<div class="tt-hint">${h.kind === "orb" ? "클릭: 열기 · 꾹 눌러 행성으로: 궤도 복귀" : "클릭: 열기 · 꾹 눌러 태양으로: 집중 · 다른 행성으로: 이동"}</div>`;
+    this.tip.innerHTML = `<div class="tt-top"><i style="--c:${p ? pColor(p) : "#fff"}"></i>${U.esc(p ? p.name : "")}</div><div class="tt-title">${U.esc(t.title)}</div>${meta.length ? `<div class="tt-meta">${meta.join("")}</div>` : ""}<div class="tt-hint">${h.kind === "orb" ? "클릭: 열기 · 두 번 클릭하거나 꾹 눌러 잡고 행성에 놓으면 궤도 복귀" : "클릭: 열기 · 두 번 클릭하거나 꾹 눌러 잡기"}</div>`;
     this.tip.hidden = false;
   },
 
@@ -566,13 +608,24 @@ const Scene = {
       const [a, b] = [...this.ptrs.values()]; this.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: this.v3d.tzoom }; return;
     }
     if (e.pointerType !== "mouse") { const ns = this.nearSystem(x, y); this.systems.forEach(s => { s.pinned = s === ns; }); }
-    const hit = this.pick(x, y); if (!hit) { e.preventDefault(); this.startOrbit(x, y, e.pointerId); return; }
+    let hit = this.pick(x, y); const c = this._click;
+    if (c && performance.now() - c.t < this.DBL && Math.hypot(x - c.x, y - c.y) < 18 && (!hit || hit.id !== c.id)) hit = { kind: c.kind, id: c.id, sys: c.sysId ? this.systems.get(c.sysId) : null };
+    if (!hit) { e.preventDefault(); this.startOrbit(x, y, e.pointerId); return; }
     this.startPending(e, { kind: hit.kind, id: hit.id, sysId: hit.sys ? hit.sys.id : null });
   },
   startPending(e, o) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     e.preventDefault();
-    const hold = o.kind === "moon" || o.kind === "orb";
+    const hold = o.kind === "moon" || o.kind === "orb", c = this._click, now = performance.now();
+    if (hold && c && c.id === o.id && now - c.t < this.DBL) {
+      clearTimeout(this._clickT); this._click = null; clearTimeout(this._hold);
+      const d = this.drag = Object.assign({ pending: false, dbl: true, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, target: null, sunTarget: false, hold, t0: now }, o);
+      this.beginDrag(d); this.ghost.style.transform = `translate3d(${d.lx}px, ${d.ly}px, 0)`; this.ghost.classList.add("lift"); this.updateHint();
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) { /* 지원 안 함 */ }
+      this._mv = ev => this.onDragMove(ev); this._up = ev => this.onUp(ev);
+      window.addEventListener("pointermove", this._mv); window.addEventListener("pointerup", this._up); window.addEventListener("pointercancel", this._up);
+      return;
+    }
     this.drag = Object.assign({ pending: true, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, target: null, sunTarget: false, hold, t0: performance.now() }, o);
     clearTimeout(this._hold);
     if (hold) this._hold = setTimeout(() => {
@@ -609,8 +662,36 @@ const Scene = {
     if (!this.reduced && Math.random() < 0.55) FX.trail(x, y, sunT ? "#ffd08a" : d.color);
   },
   onUp(e) {
-    const d = this.drag; this.endDrag(); if (!d) return;
-    if (d.pending) { if (d.kind === "moon" || d.kind === "orb") App.openTask(d.id); else if (d.kind === "planet") App.openPlanet(d.id); else if (d.kind === "sun") App.openToday(); return; }
+    const d = this.drag; if (!d) return;
+    /* 두 번 눌러 잡고 그대로 떼면: 손을 떼도 위성이 따라다니고, 다음 클릭 자리에 놓인다 */
+    if (d.dbl && !d.sticky && e.type === "pointerup" && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 12) { this.carry(d); return; }
+    this.endDrag();
+    if (d.pending) {
+      if (d.kind === "moon" || d.kind === "orb") {
+        clearTimeout(this._clickT); const id = d.id;
+        this._click = { id, kind: d.kind, sysId: d.sysId, x: d.x0, y: d.y0, t: performance.now() };
+        this._clickT = setTimeout(() => { this._click = null; App.openTask(id); }, this.DBL);
+      } else if (d.kind === "planet") App.openPlanet(d.id); else if (d.kind === "sun") App.openToday();
+      return;
+    }
+    if (e.type === "pointercancel") return;
+    this.drop(d, e);
+  },
+  carry(d) {
+    d.sticky = true; document.body.classList.add("carrying");
+    window.removeEventListener("pointerup", this._up); window.removeEventListener("pointercancel", this._up);
+    this._cd = ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      const swallow = c => { c.stopPropagation(); c.preventDefault(); };
+      window.addEventListener("click", swallow, { capture: true, once: true }); setTimeout(() => window.removeEventListener("click", swallow, true), 450);
+      if (ev.pointerType === "mouse" && ev.button !== 0) { this.endDrag(); return; }
+      this.onDragMove(ev); const dd = this.drag; this.endDrag(); if (dd) this.drop(dd, ev);
+    };
+    window.addEventListener("pointerdown", this._cd, true);
+    this.updateHint();
+  },
+  cancelCarry() { if (this.drag && this.drag.sticky) { this.endDrag(); return true; } return false; },
+  drop(d, e) {
     this.ghost.classList.remove("lift");
     const t = Store.task(d.id); if (!t) return;
     const pos = { x: e.clientX, y: e.clientY, t0: this.time };
@@ -624,6 +705,7 @@ const Scene = {
   endDrag() {
     clearTimeout(this._hold);
     window.removeEventListener("pointermove", this._mv); window.removeEventListener("pointerup", this._up); window.removeEventListener("pointercancel", this._up);
+    if (this._cd) { window.removeEventListener("pointerdown", this._cd, true); this._cd = null; } document.body.classList.remove("carrying");
     this.drag = null; this.ghost.classList.remove("lift"); this.ghost.hidden = true; this.ghost.classList.remove("over-sun"); document.body.classList.remove("dragging");
     this.systems.forEach(s => { s.hover = false; });
     this.focus.querySelectorAll(".lifted").forEach(c => c.classList.remove("lifted"));

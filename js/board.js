@@ -2,9 +2,12 @@
 "use strict";
 
 const Board = {
-  el: null, collapsed: false, hoverId: null,
+  el: null, collapsed: false, hoverId: null, mOpen: false,
   init() {
-    this.el = $("#board");
+    this.el = $("#board"); this.pill = $("#boardPill");
+    /* 휴대폰: 왼쪽 위 버튼으로 아래에서 올라오는 목록을 열고, 바깥을 누르면 닫는다 */
+    this.pill.addEventListener("click", () => { this.mOpen = !this.mOpen; this.render(); });
+    document.addEventListener("pointerdown", e => { if (this.mOpen && !this.el.contains(e.target) && !this.pill.contains(e.target) && !e.target.closest(".pop, .modal, .toasts")) this.closeM(); }, true);
     const saved = Store.state.settings.boardCollapsed;
     this.collapsed = saved != null ? !!saved : window.innerWidth < 1100;
     this.el.addEventListener("click", e => this.onClick(e));
@@ -16,19 +19,22 @@ const Board = {
   setHover(id) { if (this.hoverId === id) return; this.hoverId = id; Scene.listHover = id; },
   list() { const all = App.view === "all"; return Store.tasks().filter(t => t.status !== "done" && (all || Store.isTodayTask(t))).sort(Store.sortTasks); },
   render() {
-    const hide = App.view === "calendar" || App.view === "list" || window.innerWidth < 640;
-    this.el.hidden = hide;
-    document.body.classList.toggle("has-board", !hide && !this.collapsed);
-    Scene.setBoard(!hide && !this.collapsed ? 344 : 0);
+    const narrow = window.innerWidth < 640, overlay = App.view === "calendar" || App.view === "list";
+    if (!narrow || overlay) this.mOpen = false;
+    const hide = overlay || (narrow && !this.mOpen), collapsed = this.collapsed && !narrow;
+    this.el.hidden = hide; this.el.classList.toggle("m-sheet", narrow);
+    document.body.classList.toggle("has-board", !hide && !narrow && !collapsed);
+    Scene.setBoard(!hide && !narrow && !collapsed ? 344 : 0);
+    this.renderPill(narrow && !overlay);
     if (hide) return;
     const list = this.list(), doing = list.filter(t => t.status === "doing"), rest = list.filter(t => t.status !== "doing");
     const groups = PRIO_ORDER.map(p => [p, rest.filter(t => (t.priority || 0) === p)]).filter(([, l]) => l.length);
     const none = rest.filter(t => !t.priority).length, high = rest.filter(t => t.priority === 1).length, late = rest.filter(t => Store.isOverdue(t)).length;
     const title = App.view === "all" ? "전체 할 일" : "오늘 할 일";
     const sum = [high ? `<span class="b-chip" style="--pc:${PRIO[1].color}">${prioSvg(1, 12)}높음 ${high}</span>` : "", late ? `<span class="b-chip late">지남 ${late}</span>` : ""].join("");
-    let html = `<div class="b-head"><button type="button" class="b-title" data-act="collapse" aria-expanded="${!this.collapsed}" title="${this.collapsed ? "펼치기" : "접기"}">${ico(this.collapsed ? "chevRight" : "chevDown", 15)}<span>${title}</span><span class="b-count num">${list.length}</span></button><div class="b-sum">${sum}</div></div>`;
+    let html = `<div class="b-head"><button type="button" class="b-title" data-act="collapse" aria-expanded="${!collapsed}" title="${narrow ? "닫기" : collapsed ? "펼치기" : "접기"}">${ico(collapsed ? "chevRight" : "chevDown", 15)}<span>${title}</span><span class="b-count num">${list.length}</span></button><div class="b-sum">${sum}</div></div>`;
     if (doing.length) html += `<button type="button" class="b-now" data-act="now"><span class="f-dot"></span>집중 중 <b class="num">${doing.length}</b>개 · 아래 집중 바에서 진행 중</button>`;
-    if (!this.collapsed) {
+    if (!collapsed) {
       html += `<div class="b-body">`;
       groups.forEach(([p, l]) => { html += `<div class="b-sec"><div class="b-sh" style="--pc:${PRIO[p].color}">${prioSvg(p, 13)}${p ? PRIO[p].ko : "우선순위 미정"}<span class="n num">${l.length}</span></div>${l.map(t => this.row(t)).join("")}</div>`; });
       if (!list.length) html += `<div class="b-empty"><b>${App.view === "all" ? "남은 할 일이 없어요" : "오늘 남은 할 일이 없어요"}</b>아래 입력창에서 새 할 일을 추가하세요</div>`;
@@ -48,16 +54,23 @@ const Board = {
       <button type="button" class="b-act" data-act="fire" aria-label="${doing ? "궤도로 되돌리기" : "태양에 올려 집중"}" title="${doing ? "궤도로 되돌리기" : "태양에 올려 집중"}">${ico(doing ? "orbitBack" : "flame", 15)}</button>
     </div>`;
   },
+  renderPill(show) {
+    this.pill.hidden = !show; this.pill.classList.toggle("on", this.mOpen); if (!show) return;
+    const list = this.list(), rest = list.filter(t => t.status !== "doing"), high = rest.filter(t => t.priority === 1).length, late = rest.filter(t => Store.isOverdue(t)).length;
+    this.pill.setAttribute("aria-expanded", String(this.mOpen));
+    this.pill.innerHTML = `${ico("list", 16)}<span>${App.view === "all" ? "전체 할 일" : "오늘 할 일"}</span><b class="num">${list.length}</b>${high ? `<span class="bp-c" style="--pc:${PRIO[1].color}">높음 ${high}</span>` : ""}${late ? `<span class="bp-c late">지남 ${late}</span>` : ""}`;
+  },
+  closeM() { if (!this.mOpen) return false; this.mOpen = false; this.render(); return true; },
   due(t) { const r = U.relDate(t.due); return Store.isOverdue(t) && !r.includes("지남") ? `${r} · 지남` : r; },
   onClick(e) {
     const b = e.target.closest("[data-act]"), row = e.target.closest("[data-task]");
-    if (!b) { if (row) App.openTask(row.dataset.task); return; }
+    if (!b) { if (row) { this.closeM(); App.openTask(row.dataset.task); } return; }
     const id = row && row.dataset.task, t = id && Store.task(id);
     switch (b.dataset.act) {
-      case "collapse": this.collapsed = !this.collapsed; Store.setSetting("boardCollapsed", this.collapsed); this.render(); break;
+      case "collapse": if (this.mOpen) { this.closeM(); break; } this.collapsed = !this.collapsed; Store.setSetting("boardCollapsed", this.collapsed); this.render(); break;
       case "done": if (t) App.completeTask(id); break;
       case "prio": if (t) PrioMenu.open(b, t.priority || 0, v => Store.updateTask(id, { priority: v })); break;
-      case "fire": if (!t) break; if (t.status === "doing") { Store.stopTask(id); App.toast("orbitBack", "궤도로 돌아왔어요"); } else App.startTask(id); break;
+      case "fire": if (!t) break; if (t.status === "doing") { Store.stopTask(id); App.toast("orbitBack", "궤도로 돌아왔어요"); } else { this.closeM(); App.startTask(id); } break;
       case "now": Now.pulse(); break;
       case "triage": Modal.triage(this.list().filter(x => x.status !== "doing" && !x.priority).map(x => x.id)); break;
     }
