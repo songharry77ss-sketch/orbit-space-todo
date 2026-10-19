@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ORBIT 우주 할 일</title>
+<meta name="description" content="행성은 카테고리, 위성은 할 일. 할 일을 태양으로 끌어오면 불타오르며 집중이 시작되는 우주 테마 투두리스트.">
+<meta name="theme-color" content="#05071a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ORBIT">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-view="today">
+
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<!-- ───────── 상단 바 ───────── -->
+<header id="topbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true"><span></span></div>
+    <div class="brand-text">
+      <div class="brand-name">ORBIT</div>
+      <div class="brand-date" id="todayLabel">2026년 10월 19일 월요일</div>
+    </div>
+  </div>
+
+  <nav class="view-tabs" role="tablist" aria-label="보기 전환">
+    <button class="tab" data-view="today" role="tab" aria-selected="true"><span class="tab-ico">☀</span>오늘<kbd>1</kbd></button>
+    <button class="tab" data-view="all" role="tab"><span class="tab-ico">✦</span>전체<kbd>2</kbd></button>
+    <button class="tab" data-view="calendar" role="tab"><span class="tab-ico">▦</span>캘린더<kbd>3</kbd></button>
+  </nav>
+
+  <div class="top-actions">
+    <div class="search-wrap">
+      <span class="search-ico" aria-hidden="true">⌕</span>
+      <input id="searchInput" type="search" placeholder="할 일 검색 ( / )" autocomplete="off" aria-label="할 일 검색">
+      <div id="searchResults" class="search-results" hidden></div>
+    </div>
+    <button id="progressBtn" class="progress-btn" title="오늘의 미션 보기" aria-label="오늘의 미션 보기">
+      <svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+        <circle class="ring-bg" cx="22" cy="22" r="18"></circle>
+        <circle class="ring-fg" id="progressRing" cx="22" cy="22" r="18"></circle>
+      </svg>
+      <span class="progress-text" id="progressText">0/0</span>
+    </button>
+    <button id="settingsBtn" class="icon-btn" title="행성 관리 · 설정" aria-label="행성 관리 및 설정">⚙</button>
+  </div>
+</header>
+
+<!-- ───────── 우주 무대 ───────── -->
+<main id="stage">
+  <div id="scene" aria-label="우주 할 일 지도">
+    <div class="sun-wrap" id="sunWrap" style="--heat:0">
+      <div class="sun-glow"></div>
+      <div class="sun-corona a"></div>
+      <div class="sun-corona b"></div>
+      <div class="sun-flames" id="sunFlames"></div>
+      <div class="sun" id="sun" title="여기에 할 일을 놓으면 집중 시작">
+        <div class="sun-surface"></div>
+        <div class="sun-spots"></div>
+      </div>
+      <div class="sun-label" id="sunLabel"><span class="sun-label-main">할 일을 태양으로 끌어오세요</span><span class="sun-label-sub">놓는 순간부터 불타기 시작합니다</span></div>
+      <div class="burn-ring" id="burnRing"></div>
+    </div>
+    <div id="systems"></div>
+  </div>
+
+  <canvas id="fx" aria-hidden="true"></canvas>
+
+  <section id="calendar" class="calendar" hidden aria-label="캘린더">
+    <div class="cal-head">
+      <div class="cal-title-wrap">
+        <h2 class="cal-title" id="calTitle">2026년 10월</h2>
+        <span class="cal-sub" id="calSub"></span>
+      </div>
+      <div class="cal-nav">
+        <button class="btn ghost" id="calPrev" aria-label="이전 달">‹</button>
+        <button class="btn ghost" id="calToday">오늘</button>
+        <button class="btn ghost" id="calNext" aria-label="다음 달">›</button>
+      </div>
+    </div>
+    <div class="cal-weekdays" aria-hidden="true">
+      <span class="sun-day">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat-day">토</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-foot" id="calFoot"></div>
+  </section>
+
+  <div id="tooltip" class="tooltip" hidden></div>
+  <div id="hint" class="hint" hidden></div>
+</main>
+
+<!-- ───────── 빠른 추가 ───────── -->
+<form id="quickAdd" class="quick-add" autocomplete="off">
+  <button type="button" class="qa-chip" id="qaPlanet" title="행성 선택"><span class="dot"></span><span class="qa-chip-text">업무</span></button>
+  <input id="qaInput" type="text" placeholder="할 일 추가…  #행성  !중요  내일 오후 3시" aria-label="새 할 일">
+  <button type="button" class="qa-chip" id="qaDate" title="마감일 선택"><span class="qa-chip-ico">▦</span><span class="qa-chip-text">오늘</span></button>
+  <button type="submit" class="qa-submit" aria-label="추가">+</button>
+  <div class="popover" id="qaPlanetPop" hidden></div>
+  <div class="popover" id="qaDatePop" hidden></div>
+</form>
+
+<!-- ───────── 사이드 패널 ───────── -->
+<aside id="panel" class="panel" aria-live="polite" hidden>
+  <div class="panel-inner" id="panelInner"></div>
+</aside>
+
+<!-- ───────── 모달 ───────── -->
+<div id="modal" class="modal" hidden>
+  <div class="modal-backdrop" data-action="modal-close"></div>
+  <div class="modal-card" id="modalCard" role="dialog" aria-modal="true"></div>
+</div>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<div id="dragGhost" class="drag-ghost" hidden></div>
+
+<script src="js/utils.js"></script>
+<script src="js/store.js"></script>
+<script src="js/sky.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/mobile.js"></script>
+<script src="js/panel.js"></script>
+<script src="js/calendar.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
