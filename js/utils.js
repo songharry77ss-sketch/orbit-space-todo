@@ -9,6 +9,8 @@ const U = {
   clamp(v, a, b) { return Math.max(a, Math.min(b, v)); },
   lerp(a, b, t) { return a + (b - a) * t; },
   rand(a, b) { return a + Math.random() * (b - a); },
+  /* 받침에 맞는 조사: josa("준비", "을", "를") → "를", josa("공부", "으로", "로") → "로" */
+  josa(w, a, b) { const ch = String(w || "").trim().slice(-1), c = ch.charCodeAt(0) - 0xAC00; if (c < 0 || c > 11171) return /[013678lmnr]$/i.test(ch) ? a : b; const j = c % 28; return !j || (a === "으로" && j === 8) ? b : a; },
   esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); },
 
   dateStr(d) { return `${d.getFullYear()}-${U.pad(d.getMonth() + 1)}-${U.pad(d.getDate())}`; },

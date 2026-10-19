@@ -63,7 +63,7 @@ const Store = {
   burnedToday() {
     const today = U.today();
     return this.state.tasks.reduce((s, t) => {
-      if (t.status === "doing" && t.startedAt) s += (Date.now() - t.startedAt) / 1000;
+      if (t.status === "doing") s += this.burned(t);
       if (t.completedAt && U.dateStr(new Date(t.completedAt)) === today) s += t.burnSeconds || 0;
       return s;
     }, 0);

@@ -8,7 +8,7 @@ const App = {
   init() {
     Store.load(); this.day = U.today();
     document.querySelectorAll("[data-ico]").forEach(el => { el.outerHTML = ico(el.dataset.ico, 18); });
-    Scene.init(); Panel.init(); Calendar.init(); QuickAdd.init(); Palette.init(); Board.init();
+    Scene.init(); Panel.init(); Calendar.init(); QuickAdd.init(); Palette.init(); Board.init(); Now.init(); ListView.init();
     document.querySelectorAll(".seg-btn").forEach(b => b.addEventListener("click", () => this.setView(b.dataset.view)));
     $("#searchBtn").addEventListener("click", () => Palette.open());
     $("#settingsBtn").addEventListener("click", () => Modal.settings());
@@ -26,9 +26,9 @@ const App = {
     document.addEventListener("keydown", e => this.onKey(e));
     Store.on(d => this.onChange(d));
     const hash = location.hash.replace("#", "");
-    this.setView(["today", "all", "calendar"].includes(hash) ? hash : (Store.state.settings.view || "today"));
+    this.setView(["today", "all", "list", "calendar"].includes(hash) ? hash : (Store.state.settings.view || "today"));
     this.renderHeader();
-    setInterval(() => { Panel.tick(); Board.tick(); this.renderHeader(); }, 1000);
+    setInterval(() => { Panel.tick(); Board.tick(); Now.tick(); ListView.tick(); this.renderHeader(); }, 1000);
     Board.render();
     setInterval(() => this.checkDay(), 30000);
     window.addEventListener("resize", () => this.placeSeg());
@@ -37,18 +37,20 @@ const App = {
   },
   onChange(d) {
     Scene.sync(d);
-    if (!d.silent) { Panel.refresh(); Calendar.render(); Board.render(); }
+    if (!d.silent) { Panel.refresh(); Calendar.render(); Board.render(); ListView.render(); }
+    Now.render();
     this.renderHeader(); QuickAdd.refresh();
   },
   setView(v) {
-    if (!["today", "all", "calendar"].includes(v)) v = "today";
+    if (!["today", "all", "list", "calendar"].includes(v)) v = "today";
     this.view = v; document.body.dataset.view = v;
     document.querySelectorAll(".seg-btn").forEach(b => b.setAttribute("aria-selected", b.dataset.view === v ? "true" : "false"));
     this.placeSeg();
     const cal = $("#calendar");
     if (v === "calendar") { cal.hidden = false; Calendar.render(); } else cal.hidden = true;
+    const lv = $("#listView"); lv.hidden = v !== "list"; if (v === "list") ListView.render();
     Scene.setView(v);
-    Store.setSetting("view", v); QuickAdd.onView(v); if (Board.el) Board.render();
+    Store.setSetting("view", v); QuickAdd.onView(v); if (Board.el) Board.render(); if (Now.el) Now.render();
   },
   placeSeg() {
     const b = document.querySelector(`.seg-btn[aria-selected="true"]`), th = $(".seg-thumb"); if (!b || !th) return;
@@ -77,11 +79,11 @@ const App = {
   coach(show) {
     const el = $("#coach"); if (!show) { el.hidden = true; Store.setSetting("coachSeen", true); return; }
     const touch = Scene.touch, rows = touch
-      ? [["한 손가락 드래그", "빈 공간을 끌면 시점이 돌아가요"], ["두 손가락", "오므리거나 벌려서 확대·축소해요"], ["행성 탭", "가까이 다가가 할 일을 보여 줘요"], ["위성 → 태양", "끌어다 놓으면 집중이 시작돼요"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 탭", "전체 보기로 돌아가요"]]
-      : [["드래그", "빈 공간을 끌면 시점이 돌아가요"], ["휠", "확대하고 축소해요"], ["행성 클릭", "가까이 다가가 할 일을 보여 줘요"], ["위성 → 태양", "끌어다 놓으면 집중이 시작돼요"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 클릭", "전체 보기로 돌아가요"]];
+      ? [["한 손가락 드래그", "빈 공간을 끌면 시점이 돌아가요"], ["두 손가락", "오므리거나 벌려서 확대·축소해요"], ["행성 탭", "가까이 다가가 할 일을 보여 줘요"], ["위성 꾹 누르기", "들어 올려 태양에 놓으면 집중, 다른 행성에 놓으면 이동"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 탭", "전체 보기로 돌아가요"]]
+      : [["드래그", "빈 공간을 끌면 시점이 돌아가요"], ["휠", "확대하고 축소해요"], ["행성 클릭", "가까이 다가가 할 일을 보여 줘요"], ["위성 꾹 누르기", "들어 올려 태양에 놓으면 집중, 다른 행성에 놓으면 이동"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 클릭", "전체 보기로 돌아가요"]];
     el.innerHTML = `<div class="coach-h"><span>조작 안내</span><button type="button" class="icon-btn plain sm" data-act="close" aria-label="닫기">${ico("x", 16)}</button></div>
       <ul class="coach-list">${rows.map(([k, v]) => `<li><span class="ck">${k}</span><span>${v}</span></li>`).join("")}</ul>
-      ${touch ? "" : `<div class="coach-keys"><kbd>N</kbd> 새 할 일 <kbd>/</kbd> 검색 <kbd>0</kbd> 전체 보기 <kbd>R</kbd> 자동 회전</div>`}
+      ${touch ? "" : `<div class="coach-keys"><kbd>N</kbd> 새 할 일 <kbd>/</kbd> 검색 <kbd>3</kbd> 목록 <kbd>0</kbd> 전체 보기 <kbd>R</kbd> 자동 회전</div>`}
       <div class="coach-foot"><button type="button" class="btn sol sm" data-act="ok">알겠어요</button></div>`;
     el.hidden = false;
   },
@@ -104,7 +106,7 @@ const App = {
     const k = e.key;
     if (k === "n" || k === "N" || k === "ㅜ") { e.preventDefault(); QuickAdd.input.focus(); }
     else if (k === "/") { e.preventDefault(); Palette.open(); }
-    else if (k === "1") this.setView("today"); else if (k === "2") this.setView("all"); else if (k === "3") this.setView("calendar");
+    else if (k === "1") this.setView("today"); else if (k === "2") this.setView("all"); else if (k === "3") this.setView("list"); else if (k === "4") this.setView("calendar");
     else if (k === "t" || k === "T" || k === "ㅅ") this.openToday();
     else if (k === "+" || k === "=") Scene.zoomBy(0.82); else if (k === "-" || k === "_") Scene.zoomBy(1.22);
     else if (k === "0") Scene.resetView(); else if (k === "r" || k === "R" || k === "ㄱ") Scene.setAutoRotate(!Scene.autoRotate);
@@ -176,7 +178,7 @@ const QuickAdd = {
   },
   onView(v) {
     this.setDue(v === "today" ? U.today() : null);
-    this.input.placeholder = window.innerWidth < 640 ? "새 할 일" : v === "calendar" ? "선택한 날짜에 할 일 추가  ·  #행성  !1" : "새 할 일  ·  #행성  !1  내일 오후 3시";
+    this.input.placeholder = window.innerWidth < 640 ? "새 할 일" : v === "list" ? "새 할 일  ·  #행성  !1  내일" : v === "calendar" ? "선택한 날짜에 할 일 추가  ·  #행성  !1" : "새 할 일  ·  #행성  !1  내일 오후 3시";
   },
   refresh() { const ps = Store.planets(); if (!ps.length) return; if (!ps.find(p => p.id === this.planetId)) this.planetId = ps[0].id; this.paint(); if (!this.popP.hidden) this.renderPlanets(); },
   setDue(d) { this.due = d; if (!d) this.time = null; this.paint(); },

@@ -57,6 +57,7 @@
   <nav class="seg" id="seg" role="tablist" aria-label="보기 전환">
     <button type="button" class="seg-btn" data-view="today" role="tab">오늘</button>
     <button type="button" class="seg-btn" data-view="all" role="tab">전체</button>
+    <button type="button" class="seg-btn" data-view="list" role="tab">목록</button>
     <button type="button" class="seg-btn" data-view="calendar" role="tab">캘린더</button>
     <span class="seg-thumb" aria-hidden="true"></span>
   </nav>
@@ -70,6 +71,8 @@
   </div>
 </header>
 
+<section id="listView" class="listview" hidden aria-label="모든 할 일 목록"></section>
+<section id="nowbar" class="nowbar" hidden aria-label="지금 집중 중"></section>
 <section id="calendar" class="calendar" hidden aria-label="캘린더">
   <div class="cal-head">
     <div><h2 class="cal-title" id="calTitle"></h2><p class="cal-sub" id="calSub"></p></div>
@@ -128,6 +131,8 @@
 <script src="js/panel.js"></script>
 <script src="js/calendar.js"></script>
 <script src="js/board.js"></script>
+<script src="js/now.js"></script>
+<script src="js/listview.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

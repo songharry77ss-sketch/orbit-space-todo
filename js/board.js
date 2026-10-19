@@ -1,4 +1,4 @@
-/* ═══════════════ 오늘 보드: 집중 중 + 우선순위별 할 일을 한눈에 (데스크톱 왼쪽) ═══════════════ */
+/* ═══════════════ 오늘 보드: 우선순위별 할 일을 한눈에 (데스크톱 왼쪽) ═══════════════ */
 "use strict";
 
 const Board = {
@@ -16,7 +16,7 @@ const Board = {
   setHover(id) { if (this.hoverId === id) return; this.hoverId = id; Scene.listHover = id; },
   list() { const all = App.view === "all"; return Store.tasks().filter(t => t.status !== "done" && (all || Store.isTodayTask(t))).sort(Store.sortTasks); },
   render() {
-    const hide = App.view === "calendar" || window.innerWidth < 640;
+    const hide = App.view === "calendar" || App.view === "list" || window.innerWidth < 640;
     this.el.hidden = hide;
     document.body.classList.toggle("has-board", !hide && !this.collapsed);
     Scene.setBoard(!hide && !this.collapsed ? 344 : 0);
@@ -27,7 +27,7 @@ const Board = {
     const title = App.view === "all" ? "전체 할 일" : "오늘 할 일";
     const sum = [high ? `<span class="b-chip" style="--pc:${PRIO[1].color}">${prioSvg(1, 12)}높음 ${high}</span>` : "", late ? `<span class="b-chip late">지남 ${late}</span>` : ""].join("");
     let html = `<div class="b-head"><button type="button" class="b-title" data-act="collapse" aria-expanded="${!this.collapsed}" title="${this.collapsed ? "펼치기" : "접기"}">${ico(this.collapsed ? "chevRight" : "chevDown", 15)}<span>${title}</span><span class="b-count num">${list.length}</span></button><div class="b-sum">${sum}</div></div>`;
-    if (doing.length) html += `<div class="b-sec fire"><div class="b-sh"><span class="f-dot"></span>집중 중<span class="n num">${doing.length}</span></div>${doing.map(t => this.row(t)).join("")}</div>`;
+    if (doing.length) html += `<button type="button" class="b-now" data-act="now"><span class="f-dot"></span>집중 중 <b class="num">${doing.length}</b>개 · 아래 집중 바에서 진행 중</button>`;
     if (!this.collapsed) {
       html += `<div class="b-body">`;
       groups.forEach(([p, l]) => { html += `<div class="b-sec"><div class="b-sh" style="--pc:${PRIO[p].color}">${prioSvg(p, 13)}${p ? PRIO[p].ko : "우선순위 미정"}<span class="n num">${l.length}</span></div>${l.map(t => this.row(t)).join("")}</div>`; });
@@ -58,6 +58,7 @@ const Board = {
       case "done": if (t) App.completeTask(id); break;
       case "prio": if (t) PrioMenu.open(b, t.priority || 0, v => Store.updateTask(id, { priority: v })); break;
       case "fire": if (!t) break; if (t.status === "doing") { Store.stopTask(id); App.toast("orbitBack", "궤도로 돌아왔어요"); } else App.startTask(id); break;
+      case "now": Now.pulse(); break;
       case "triage": Modal.triage(this.list().filter(x => x.status !== "doing" && !x.priority).map(x => x.id)); break;
     }
   },
