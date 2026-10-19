@@ -17,7 +17,7 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
   if (url.origin === location.origin) {
     // 앱 파일: 네트워크 우선(항상 최신), 실패하면 캐시(오프라인)
-    e.respondWith(fetch(req).then(res => { if (res.ok) caches.open(CACHE).then(c => c.put(req, res.clone())); return res; }).catch(() => caches.match(req).then(hit => hit || caches.match("./index.html"))));
+    e.respondWith(fetch(req, { cache: "no-cache" }).then(res => { if (res.ok) caches.open(CACHE).then(c => c.put(req, res.clone())); return res; }).catch(() => caches.match(req).then(hit => hit || caches.match("./index.html"))));
   } else if (/fonts\.(googleapis|gstatic)\.com/.test(url.host)) {
     // 글꼴: 캐시 우선
     e.respondWith(caches.open(CACHE + "-fonts").then(async c => {

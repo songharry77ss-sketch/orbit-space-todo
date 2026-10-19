@@ -36,6 +36,8 @@ const Calendar = {
     const byDate = new Map();
     for (const t of Store.tasks()) { if (!t.due) continue; if (!byDate.has(t.due)) byDate.set(t.due, []); byDate.get(t.due).push(t); }
     const rows = (Math.ceil((first.getDay() + new Date(y, m + 1, 0).getDate()) / 7));
+    const cellH = (this.grid.clientHeight || 400) / rows, narrow = window.innerWidth < 640;
+    const max = narrow ? U.clamp(Math.floor((cellH - 22) / 9), 1, 6) : U.clamp(Math.floor((cellH - 30) / 19), 1, 5);
     let html = "", monthTotal = 0, monthDone = 0;
     for (let i = 0; i < rows * 7; i++) {
       const d = new Date(start); d.setDate(start.getDate() + i); const ds = U.dateStr(d);
@@ -43,7 +45,7 @@ const Calendar = {
       const other = d.getMonth() !== m, done = list.filter(t => t.status === "done").length;
       if (!other) { monthTotal += list.length; monthDone += done; }
       const cls = ["cal-cell", other ? "other" : "", ds === today ? "today" : "", ds === this.selected ? "sel" : "", d.getDay() === 0 ? "sun" : "", d.getDay() === 6 ? "sat" : ""].filter(Boolean).join(" ");
-      const max = 3, shown = list.slice(0, max);
+      const shown = list.slice(0, max);
       html += `<div class="${cls}" data-date="${ds}">
         <div class="cal-day"><span>${d.getDate()}</span>${list.length ? `<span class="cnt ${done === list.length ? "alldone" : ""}">${done}/${list.length}</span>` : ""}</div>
         ${shown.map(t => { const p = Store.planet(t.planetId); return `<div class="cal-task ${t.status} ${t.important ? "imp" : ""}" draggable="true" data-id="${t.id}" style="--c:${p ? p.color : "#fff"}" title="${U.esc(t.title)}">${t.status === "doing" ? "🔥" : ""}<span class="t">${U.esc(t.title)}</span></div>`; }).join("")}
