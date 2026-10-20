@@ -1,6 +1,11 @@
 # Google OAuth 앱 인증 준비 자료
 
-ORBIT의 Google 캘린더 연동을 누구나 경고 없이 쓰게 하려면 Google 인증 플랫폼에서 앱을 **프로덕션으로 게시**하고, 민감한 범위가 있으면 **인증(검토)을 신청**합니다. 아래는 신청서에 그대로 쓰는 값과 문장입니다.
+**현재 상태 (2026-10-20)**: Google Cloud 프로젝트 `orbit-512205` 의 앱이 **프로덕션**으로 게시되어 있습니다. 기본 연결 권한 `calendar.app.created` · `calendar.calendarlist.readonly` 는 Google 분류상 민감하지 않은 범위라 **심사 없이 누구나 경고 없이** 연결합니다. 인증 센터에도 「인증이 필요하지 않습니다」로 표시됩니다.
+
+이 문서가 필요한 경우는 두 가지입니다.
+
+1. **브랜드 인증**(동의 화면에 주소 대신 「ORBIT」 이름 표시): Google Search Console에서 `https://orbit-space-todo.vercel.app/` 소유 확인 → 24시간 뒤 Google 인증 플랫폼 → 브랜딩 → 문제 보기 → 「문제를 해결함」 → 계속.
+2. **선택 기능 「내 구글 일정 함께 보기」**(`calendar.events.readonly`, 민감한 범위)를 경고 없이 쓰게 하려면: 데이터 액세스에 이 범위를 추가하고 인증 센터에서 검토를 신청합니다. 아래 값 · 문장 · 영상 대본을 씁니다.
 
 ## 신청서 값
 
@@ -13,7 +18,7 @@ ORBIT의 Google 캘린더 연동을 누구나 경고 없이 쓰게 하려면 Goo
 | 도메인 소유 확인 | Google Search Console → URL 접두어 `https://orbit-space-todo.vercel.app/` → HTML 태그 방식. 받은 `google-site-verification` 메타 태그를 index.html · about.html `<head>` 에 넣고 배포 |
 | 승인된 JavaScript 원본 | https://orbit-space-todo.vercel.app · https://songharry77ss-sketch.github.io · http://localhost:5173 |
 
-## 범위별 사용 이유 (영어로 제출)
+## 범위별 사용 이유 (영어로 제출 · 일정 읽기 범위를 신청할 때)
 
 **https://www.googleapis.com/auth/calendar.app.created**
 > ORBIT is a to-do app. When the user connects Google Calendar, ORBIT creates one secondary calendar named "ORBIT 할 일" in the user's account and keeps the user's tasks that have due dates in sync with events in that calendar only: creating, updating and deleting those events when the user adds, edits, completes or deletes tasks in ORBIT, and reading changes the user makes to those events in Google Calendar (date or title changes, deletions, new events) so that ORBIT reflects them. ORBIT never modifies any other calendar.

@@ -32,6 +32,7 @@ const App = {
     setInterval(() => { Panel.tick(); Board.tick(); Now.tick(); ListView.tick(); this.renderHeader(); }, 1000);
     Board.render();
     setInterval(() => this.checkDay(), 30000);
+    this.away(); setInterval(() => this.away(), 60000);
     window.addEventListener("resize", () => this.placeSeg());
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.placeSeg());
 
@@ -87,6 +88,19 @@ const App = {
       ${touch ? "" : `<div class="coach-keys"><kbd>N</kbd> 새 할 일 <kbd>/</kbd> 검색 <kbd>3</kbd> 목록 <kbd>0</kbd> 전체 보기 <kbd>R</kbd> 자동 회전</div>`}
       <div class="coach-foot"><button type="button" class="btn sol sm" data-act="ok">알겠어요</button></div>`;
     el.hidden = false;
+  },
+  /* 앱이 꺼져 있었거나 컴퓨터가 잠든 동안은 집중 시간에서 뺀다.
+     앱이 켜져 있으면(다른 창에서 일해도) 그대로 센다. 1분마다 「마지막으로 살아 있던 때」를 적어 두고, 20분 넘게 비면 그만큼 뺀다 */
+  away() {
+    const now = Date.now(), seen = +Store.state.settings.seen || now, gap = now - seen;
+    Store.setSetting("seen", now);
+    if (gap < 20 * 60000) return;
+    const doing = Store.tasks().filter(t => t.status === "doing" && t.startedAt && t.startedAt < seen);
+    if (!doing.length) return;
+    const before = doing.map(t => [t.id, t.startedAt]);
+    doing.forEach(t => { t.startedAt = Math.min(now, t.startedAt + gap); });
+    Store.emit({ type: "away" });
+    this.toast("pause", `자리를 비운 ${U.fmtDuration(gap / 1000)}은 집중 시간에서 뺐어요`, () => { before.forEach(([id, st]) => { const t = Store.task(id); if (t) t.startedAt = st; }); Store.emit({ type: "away" }); });
   },
   checkDay() { if (this.day !== U.today()) { this.day = U.today(); Scene.sync({ type: "day" }); Panel.refresh(); Calendar.render(); this.renderHeader(); QuickAdd.onView(this.view); } },
   onKey(e) {

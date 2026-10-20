@@ -55,7 +55,7 @@ const U = {
     sec = Math.floor(sec);
     if (sec < 60) return `${sec}초`;
     const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
-    return h ? `${h}시간 ${m}분` : `${m}분`;
+    return h ? (m ? `${h}시간 ${m}분` : `${h}시간`) : `${m}분`;
   },
   fmtStamp(ts) { const d = new Date(ts); return `${d.getFullYear()}.${U.pad(d.getMonth() + 1)}.${U.pad(d.getDate())}`; },
 
