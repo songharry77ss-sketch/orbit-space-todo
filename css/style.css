@@ -859,3 +859,98 @@ body:has(.focus-chip:not([hidden])) .board-pill, body.sheet-open .board-pill { d
   .board.m-sheet .b-row { min-height: 52px; }
   .board.m-sheet .b-t { font-size: 14.5px; }
 }
+
+/* ───────── 캘린더: 월 · 주 전환과 주간 보기 ───────── */
+.cal-seg { display: flex; padding: 2px; margin-right: 6px; border-radius: 8px; border: 1px solid var(--line-2); }
+.cal-seg button { height: 26px; min-width: 36px; padding: 0 10px; border-radius: 6px; font-size: 13px; font-weight: 560; color: var(--ink-3); transition: background 0.12s, color 0.12s; }
+.cal-seg button:hover { color: var(--ink); }
+.cal-seg button.on { background: var(--raise-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-2); }
+.cal-grid.wk { grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
+.wk-col { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); transition: background 0.12s, box-shadow 0.12s; }
+.wk-col:last-child { border-right: 0; }
+.wk-col.past { background: rgba(0, 0, 0, 0.14); }
+.wk-col.today { background: rgba(244, 162, 89, 0.04); }
+.wk-col.sel .wk-head { background: var(--raise-2); }
+.wk-col.drop { background: rgba(244, 162, 89, 0.1); box-shadow: inset 0 0 0 1px var(--sol); }
+.wk-head { display: flex; align-items: center; gap: 7px; height: 48px; padding: 0 10px 0 12px; flex: none; border-bottom: 1px solid var(--line); text-align: left; transition: background 0.12s; }
+.wk-head:hover { background: var(--raise); }
+.wk-head .wd { font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.wk-head .d { display: grid; place-items: center; min-width: 28px; height: 28px; padding: 0 4px; border-radius: 8px; font-family: var(--f-num); font-size: 15px; font-weight: 600; color: var(--ink); }
+.wk-head .tdy { font-size: 11px; font-weight: 650; color: var(--sol-2); }
+.wk-col.today .wk-head .d { background: var(--sol); color: var(--sol-ink); }
+.wk-col.sun .wk-head .wd, .wk-col.sun:not(.today) .wk-head .d { color: rgba(240, 113, 125, 0.92); }
+.wk-col.sat .wk-head .wd, .wk-col.sat:not(.today) .wk-head .d { color: rgba(130, 170, 255, 0.95); }
+.wk-head .cnt { margin-left: auto; font-family: var(--f-num); font-size: 11px; color: var(--ink-4); }
+.wk-head .cnt.alldone { color: var(--ok); }
+.wk-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 5px; padding: 8px 7px 10px; }
+.wk-task { position: relative; display: flex; align-items: flex-start; gap: 8px; flex: none; padding: 8px 8px 8px 9px; border-radius: 7px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.035); box-shadow: inset 2px 0 0 var(--c); cursor: pointer; transition: background 0.12s, border-color 0.12s, opacity 0.12s; }
+.wk-task[draggable="true"] { cursor: grab; }
+.wk-task:hover, .wk-task:focus-visible { background: var(--raise-2); border-color: var(--line-2); outline: 0; }
+.wk-task .check { width: 16px; height: 16px; margin-top: 1px; }
+.wk-main { flex: 1; min-width: 0; }
+.wk-t { display: flex; align-items: flex-start; gap: 4px; font-size: 12.5px; font-weight: 560; line-height: 1.38; word-break: keep-all; overflow-wrap: anywhere; }
+.wk-t .prio-ico { flex: none; margin-top: 3px; }
+.wk-t span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.wk-task.p1 .wk-t { font-weight: 650; }
+.wk-m { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 4px; font-size: 11px; color: var(--ink-3); }
+.wk-m > span { display: inline-flex; align-items: center; gap: 4px; }
+.wk-m .tm { color: var(--ink-2); font-variant-numeric: tabular-nums; font-weight: 560; }
+.wk-m .pd { width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.wk-task.done { opacity: 0.58; }
+.wk-task.done .wk-t { text-decoration: line-through; color: var(--ink-3); }
+.wk-task.doing { border-color: rgba(244, 162, 89, 0.42); background: rgba(244, 162, 89, 0.07); box-shadow: inset 2px 0 0 var(--sol); }
+.wk-task.doing .wk-t { color: var(--sol-2); }
+.wk-task.dragging { opacity: 0.35; }
+.wk-add { display: flex; align-items: center; justify-content: center; gap: 5px; height: 30px; flex: none; border-radius: 7px; font-size: 12px; color: transparent; border: 1px dashed transparent; transition: color 0.12s, border-color 0.12s, background 0.12s; }
+.wk-col:hover .wk-add, .wk-add:focus-visible, body.touch .wk-add { color: var(--ink-3); border-color: var(--line); }
+.wk-add:hover { color: var(--ink); border-color: var(--line-2); background: var(--raise); }
+.wk-addrow { flex: none; }
+.wk-addrow input { width: 100%; height: 34px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--sol); background: var(--raise); color: var(--ink); font: inherit; font-size: 13px; outline: 0; }
+.cal-fr { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.cal-fr .sep { color: var(--ink-4); }
+.pill-btn.sm { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; font-size: 12.5px; }
+.pill-btn .ico { color: var(--ink-3); }
+@media (max-width: 639.98px) {
+  .cal-seg { margin-right: 2px; }
+  .cal-seg button { min-width: 32px; padding: 0 8px; }
+  .cal-grid.wk { display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+  .wk-col { display: grid; grid-template-columns: 56px minmax(0, 1fr); flex: none; border-right: 0; border-bottom: 1px solid var(--line); }
+  .wk-head { flex-direction: column; justify-content: flex-start; align-items: center; gap: 2px; height: auto; padding: 10px 0; border-bottom: 0; border-right: 1px solid var(--line); }
+  .wk-head .cnt { margin: 2px 0 0; }
+  .wk-list { overflow: visible; padding: 8px; }
+  .wk-t { font-size: 14px; }
+  .wk-m { font-size: 11.5px; }
+  .wk-add { justify-content: flex-start; padding: 0 8px; color: var(--ink-4); border-color: transparent; }
+  .cal-fr .hint, .cal-fr .sep { display: none; }
+}
+
+/* ───────── 캘린더 연동 창 · 상세의 「캘린더에 추가」 ───────── */
+.cs-seg { display: inline-flex; padding: 2px; margin-bottom: 12px; border-radius: 9px; border: 1px solid var(--line-2); }
+.cs-seg button { height: 30px; padding: 0 12px; border-radius: 7px; font-size: 13px; color: var(--ink-3); transition: background 0.12s, color 0.12s; }
+.cs-seg button b { margin-left: 4px; font-weight: 600; color: var(--ink-2); }
+.cs-seg button.on { background: var(--raise-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-2); }
+.cs-row { margin: 0 0 14px; }
+.cs-how { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.cs-how li { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); }
+.cs-how b { font-weight: 620; color: var(--ink); }
+.cs-note { margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: var(--ink-3); }
+.cs-prev { font-size: 13px; color: var(--ink-2); }
+.cs-prev b { color: var(--ink); }
+.cs-list { list-style: none; margin: 10px 0 14px; padding: 0; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.cs-list li { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 0 12px; font-size: 12.5px; border-top: 1px solid var(--line); }
+.cs-list li:first-child { border-top: 0; }
+.cs-list .d { flex: none; min-width: 92px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.cs-list .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.cs-list .r { color: var(--ink-3); display: inline-flex; }
+.cs-list .more { color: var(--ink-3); }
+.cs-lbl { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.cs-planets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.cs-planets button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px 0 7px; border-radius: 8px; font-size: 13px; color: var(--ink-2); border: 1px solid var(--line-2); transition: border-color 0.12s, color 0.12s, background 0.12s; }
+.cs-planets button img { border-radius: 50%; }
+.cs-planets button:hover { color: var(--ink); border-color: var(--line-3); }
+.cs-planets button.on { color: var(--ink); border-color: var(--sol); background: rgba(244, 162, 89, 0.08); }
+.cal-add { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--ink-3); }
+.cal-add span { margin-right: 2px; }
+.cal-add button { height: 26px; padding: 0 9px; border-radius: 6px; font-size: 12px; color: var(--ink-2); border: 1px solid var(--line-2); transition: border-color 0.12s, color 0.12s; }
+.cal-add button:hover { color: var(--ink); border-color: var(--line-3); }
+@media (max-width: 639.98px) { .cs-how li { grid-template-columns: 1fr; gap: 2px; } }

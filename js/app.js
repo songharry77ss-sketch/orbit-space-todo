@@ -113,7 +113,7 @@ const App = {
     else if (k === "+" || k === "=") Scene.zoomBy(0.82); else if (k === "-" || k === "_") Scene.zoomBy(1.22);
     else if (k === "0") Scene.resetView(); else if (k === "r" || k === "R" || k === "ㄱ") Scene.setAutoRotate(!Scene.autoRotate);
     else if (k === "?") this.coach($("#coach").hidden);
-    else if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); Scene.rotateBy(k === "ArrowLeft" ? 0.22 : -0.22, 0); }
+    else if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); if (this.view === "calendar") Calendar.move(k === "ArrowLeft" ? -1 : 1); else Scene.rotateBy(k === "ArrowLeft" ? 0.22 : -0.22, 0); }
     else if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); Scene.rotateBy(0, k === "ArrowUp" ? 0.1 : -0.1); }
   },
   /* 할 일·행성을 열면 카메라가 그 행성으로 다가가고, 목록 화면은 전체 보기로 돌아간다 */
@@ -321,17 +321,17 @@ const Modal = {
       <div class="btn-row" style="margin-top:12px"><button type="button" class="btn sm" id="mCoach">${ico("help", 15)}조작 안내 보기</button></div>
       <h4>앱으로 쓰기</h4><p class="desc" style="margin:0 0 10px">${how}</p>${App.installPrompt ? `<div class="btn-row"><button type="button" class="btn sol sm" id="mInstall">${ico("install", 15)}앱으로 설치</button></div>` : ""}
       <h4>데이터</h4>
-      <div class="btn-row"><button type="button" class="btn sm" id="mExport">${ico("download", 15)}JSON 내보내기</button><button type="button" class="btn sm" id="mCopy">${ico("copy", 15)}복사</button><label class="btn sm" for="mFile">${ico("upload", 15)}가져오기</label><input type="file" id="mFile" accept="application/json,.json" hidden></div>
+      <div class="btn-row"><button type="button" class="btn sm" id="mExport">${ico("download", 15)}JSON 내보내기</button><button type="button" class="btn sm" id="mCopy">${ico("copy", 15)}복사</button><button type="button" class="btn sm" id="mCal">${ico("calendar", 15)}캘린더 연동</button><label class="btn sm" for="mFile">${ico("upload", 15)}가져오기</label><input type="file" id="mFile" accept="application/json,.json" hidden></div>
       <div class="btn-row" style="margin-top:8px"><button type="button" class="btn sm" id="mSample">예시 데이터로 시작</button><button type="button" class="btn sm danger" id="mReset">모두 지우기</button></div>
       <h4>단축키</h4>
-      <div class="keys"><kbd>N</kbd><span>새 할 일</span><kbd>/</kbd><span>검색 (Ctrl+K)</span><kbd>1 2 3</kbd><span>오늘 · 전체 · 캘린더</span><kbd>T</kbd><span>오늘의 미션</span><kbd>+ −</kbd><span>확대 · 축소</span><kbd>← → ↑ ↓</kbd><span>시점 회전</span><kbd>0</kbd><span>전체 보기</span><kbd>R</kbd><span>자동 회전 켜기·끄기</span><kbd>Esc</kbd><span>닫기</span></div>
+      <div class="keys"><kbd>N</kbd><span>새 할 일</span><kbd>/</kbd><span>검색 (Ctrl+K)</span><kbd>1 2 3 4</kbd><span>오늘 · 전체 · 목록 · 캘린더</span><kbd>T</kbd><span>오늘의 미션</span><kbd>+ −</kbd><span>확대 · 축소</span><kbd>← → ↑ ↓</kbd><span>시점 회전</span><kbd>0</kbd><span>전체 보기</span><kbd>R</kbd><span>자동 회전 켜기·끄기</span><kbd>Esc</kbd><span>닫기</span></div>
       <p class="desc" style="margin:12px 0 0">입력 팁: <b>#행성이름</b>으로 행성을, <b>!1 !2 !3</b>(또는 !높음 !보통 !낮음)으로 우선순위를 정해요. 「내일」「다음주 금요일」「오후 3시」「12/25」 같은 날짜와 시간도 알아들어요.</p>
       <h4>이미지 출처</h4>
       <p class="credits">행성·태양·은하수 텍스처는 <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>의 자료(CC BY 4.0)예요. NASA 탐사선과 관측 자료를 바탕으로 만든 지도입니다.</p>
       <div class="m-actions"><button type="button" class="btn" id="mClose">닫기</button></div>`);
     const c = this.card, on = (s, f) => { const el = c.querySelector(s); if (el) el.addEventListener("click", f); };
     c.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => this.planet(b.dataset.edit)));
-    on("#mAdd", () => this.planet(null)); on("#mClose", () => this.close());
+    on("#mAdd", () => this.planet(null)); on("#mCal", () => CalSync.open()); on("#mClose", () => this.close());
     on("#mSpin", e => { const b = e.currentTarget, v = !Scene.autoRotate; Scene.setAutoRotate(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
     on("#mCoach", () => { this.close(); App.coach(true); });
     on("#mNames", e => { const b = e.currentTarget, v = !Scene.showNames; Scene.setNames(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });

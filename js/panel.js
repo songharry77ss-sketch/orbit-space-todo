@@ -72,6 +72,7 @@ const Panel = {
         <div class="prop">${ico("calendar", 18)}<span class="k">마감</span><div class="v">
           <div class="date-pair"><input type="date" id="taskDue" data-field="due" value="${t.due || ""}" aria-label="마감일"><input type="time" id="taskTime" data-field="time" value="${t.time || ""}" aria-label="시간"></div>
           <div class="pills">${qd.map(([l, v]) => `<button type="button" class="pill ${(t.due || "") === v ? "on" : ""}" data-act="due" data-v="${v}">${l}</button>`).join("")}${t.due && !qd.some(([, v]) => v === t.due) ? `<span class="due-rel ${Store.isOverdue(t) ? "late" : ""}">${U.relDate(t.due)}</span>` : ""}</div>
+          ${t.due ? `<div class="cal-add"><span>캘린더에 추가</span><button type="button" data-act="cal-add" data-to="google">Google</button><button type="button" data-act="cal-add" data-to="outlook">Outlook</button><button type="button" data-act="cal-add" data-to="ics" title="애플 · 삼성 캘린더 등">.ics 파일</button></div>` : ""}
         </div></div>
         <div class="prop">${ico("repeat", 18)}<span class="k">반복</span><div class="v"><select id="taskRepeat" data-field="repeat" aria-label="반복">${Store.REPEATS.map(([v, l]) => `<option value="${v}" ${t.repeat === v ? "selected" : ""}>${l}</option>`).join("")}</select></div></div>
       </div>
@@ -195,6 +196,7 @@ ${extra}
       case "row-fire": if (!t) break; if (t.status === "doing") { Store.stopTask(t.id); App.toast("orbitBack", "궤도로 돌아왔어요"); } else App.startTask(t.id); break;
       case "toggle-myday": if (!t) break; Store.updateTask(tid, { myDay: t.myDay === today ? null : today }); App.toast("sun", t.myDay === today ? "오늘 할 일에 추가했어요" : "오늘 할 일에서 뺐어요"); break;
       case "suggest-add": if (!t) break; Store.updateTask(tid, { myDay: today }); App.toast("sun", `「${t.title}」 오늘 할 일에 추가`); break;
+      case "cal-add": CalSync.addOne(tid, btn.dataset.to); break;
       case "due": if (t) Store.updateTask(tid, { due: btn.dataset.v || null, time: btn.dataset.v ? t.time : null }); break;
       case "step-toggle": { const li = btn.closest("[data-step]"), s = t.steps.find(x => x.id === li.dataset.step); Store.updateStep(tid, s.id, { done: !s.done }); break; }
       case "step-del": Store.removeStep(tid, btn.closest("[data-step]").dataset.step); break;

@@ -1,8 +1,8 @@
 /* ORBIT 서비스 워커: 온라인이면 항상 최신 파일, 오프라인이면 캐시로 열립니다. 설치형 앱(PWA) 요건도 충족합니다. */
-const CACHE = "orbit-v10";
+const CACHE = "orbit-v11";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest", "./css/style.css",
-  "./js/utils.js", "./js/bodies.js", "./js/icons.js", "./js/store.js", "./js/gl.js", "./js/gl3d.js", "./js/fx.js", "./js/scene.js", "./js/panel.js", "./js/calendar.js", "./js/board.js", "./js/now.js", "./js/listview.js", "./js/app.js",
+  "./js/utils.js", "./js/bodies.js", "./js/icons.js", "./js/store.js", "./js/gl.js", "./js/gl3d.js", "./js/fx.js", "./js/scene.js", "./js/panel.js", "./js/calendar.js", "./js/calsync.js", "./js/board.js", "./js/now.js", "./js/listview.js", "./js/app.js",
   "./textures/sun.jpg", "./textures/moon.jpg", "./textures/earth_daymap.jpg", "./textures/earth_nightmap.jpg", "./textures/earth_clouds.jpg",
   "./textures/jupiter.jpg", "./textures/mars.jpg", "./textures/neptune.jpg", "./textures/saturn.jpg", "./textures/saturn_ring.png",
   "./textures/venus_atmosphere.jpg", "./textures/uranus.jpg", "./textures/mercury.jpg", "./textures/stars_milky_way_2k.jpg",
