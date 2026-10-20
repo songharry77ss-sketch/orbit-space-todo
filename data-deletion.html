@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORBIT 데이터 삭제</title>
+<meta name="description" content="ORBIT 우주 할 일 앱의 데이터를 지우는 방법">
+<style>
+  :root { color-scheme: dark; --bg: #05060a; --ink: #eceef3; --ink-2: #aeb4c1; --ink-3: #747b8b; --line: rgba(255,255,255,.09); --sol: #f4a259; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.75 "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 56px 20px 80px; }
+  h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; }
+  .sub { margin: 0 0 32px; color: var(--ink-3); font-size: 13.5px; }
+  h2 { margin: 34px 0 10px; padding-top: 22px; border-top: 1px solid var(--line); font-size: 16px; }
+  p, li { color: var(--ink-2); }
+  ol, ul { padding-left: 22px; }
+  b { color: var(--ink); font-weight: 620; }
+  a { color: var(--sol); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
+  th { color: var(--ink); font-weight: 620; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ORBIT 데이터 삭제 안내</h1>
+  <p class="sub">앱: ORBIT 우주 할 일 · 개발자: CRAVING</p>
+
+  <p>ORBIT은 회원가입이 없고 운영 서버에 사용자 데이터를 보관하지 않습니다. 할 일은 사용하는 기기의 브라우저 저장소에만 있고, Google 캘린더를 연결한 경우에만 사용자 본인의 Google 계정에 「ORBIT 할 일」 캘린더 일정이 만들어집니다. 아래 단계로 언제든 모두 지울 수 있습니다.</p>
+
+  <h2>1. 앱 안에서 지우기</h2>
+  <ol>
+    <li>할 일 하나를 지우려면 할 일을 눌러 상세를 연 뒤 아래쪽 <b>삭제</b>를 누릅니다. Google 캘린더가 연결돼 있으면 해당 일정도 함께 지워집니다.</li>
+    <li>모든 할 일을 한 번에 지우려면 오른쪽 위 <b>설정</b> → <b>데이터</b> → <b>모두 지우기</b>를 누릅니다. 기기에 저장된 모든 행성과 할 일이 지워집니다.</li>
+  </ol>
+
+  <h2>2. Google 캘린더 연결 끊고 지우기</h2>
+  <ol>
+    <li>ORBIT <b>캘린더</b> → <b>캘린더 연동</b> → <b>연결 끊기</b>를 누릅니다. 접근 권한이 해제되고 기기에 남은 연결 기록과 일정 미리보기가 지워집니다.</li>
+    <li><a href="https://calendar.google.com/calendar/r/settings" target="_blank" rel="noopener">Google 캘린더 설정</a>에서 「ORBIT 할 일」 캘린더를 선택하고 <b>캘린더 삭제</b>를 누르면 ORBIT이 만든 일정이 모두 지워집니다.</li>
+    <li><a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google 계정 → 서드파티 앱 접근</a>에서 ORBIT(orbit-space-todo.vercel.app)을 찾아 접근 권한을 없앨 수도 있습니다.</li>
+  </ol>
+
+  <h2>삭제되는 데이터와 보관 기간</h2>
+  <table>
+    <tr><th>데이터</th><th>저장 위치</th><th>삭제 시점</th></tr>
+    <tr><td>할 일 · 행성 · 집중 기록</td><td>사용자 기기(브라우저 저장소)</td><td>앱에서 지우면 즉시. 앱 데이터나 사이트 데이터를 지워도 즉시 삭제</td></tr>
+    <tr><td>「ORBIT 할 일」 캘린더 일정</td><td>사용자 본인의 Google 계정</td><td>앱에서 할 일을 지우거나 Google 캘린더에서 캘린더를 지우면 즉시(Google 정책에 따름)</td></tr>
+    <tr><td>Google 접근 토큰 · 연결 기록</td><td>사용자 기기</td><td>연결 끊기 시 즉시. 토큰은 최대 1시간 뒤 자동 만료</td></tr>
+  </table>
+  <p>운영자는 별도로 보관하는 데이터가 없으므로 추가 보관 기간이 없습니다.</p>
+
+  <h2>문의</h2>
+  <p>삭제 관련 도움이 필요하면 <a href="https://github.com/songharry77ss-sketch/orbit-space-todo/issues" target="_blank" rel="noopener">GitHub 이슈</a>로 알려 주세요. <a href="privacy.html">개인정보처리방침</a> · <a href="./">ORBIT으로 돌아가기</a></p>
+</main>
+</body>
+</html>
