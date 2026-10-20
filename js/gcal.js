@@ -17,6 +17,9 @@ const GCal = {
   token: null, exp: 0, scope: "", tc: null, busy: false, again: false, timer: null, err: "", listed: false,
   ext: [], extCals: [], extRange: null,
   st() { const s = Store.state.settings; if (!s.gcal || typeof s.gcal !== "object") s.gcal = { on: false, calId: null, email: "", map: {}, syncToken: null, last: 0, show: false }; if (!s.gcal.map) s.gcal.map = {}; return s.gcal; },
+  /* iOS 앱(App Store) 안에서는 구글 로그인을 앱이 대신하고 토큰만 넘겨준다(구글은 앱 내부 웹뷰 로그인을 막음) */
+  native() { return window.ORBIT_NATIVE === "ios" && !!window.ReactNativeWebView; },
+  post(m) { try { window.ReactNativeWebView.postMessage(JSON.stringify(m)); } catch (_) { /* 앱 밖 */ } },
   clientId() { return GCAL_CLIENT_ID || Store.state.settings.gcalClientId || ""; },
   on() { return !!(this.clientId() && this.st().on); },
   live() { return !!this.token && this.exp > Date.now() + 30000; },
@@ -28,12 +31,14 @@ const GCal = {
     Store.on(d => { if (!d.gcal && d.type !== "settings") this.schedule(); });
     document.addEventListener("visibilitychange", () => { if (!document.hidden) this.sync(); });
     setInterval(() => this.sync(), 120000);
-    if (this.clientId()) this.loadGis().catch(() => {});
+    if (this.clientId() && !this.native()) this.loadGis().catch(() => {});
     this.paint();
+    if (this.native() && this.on() && !this.live()) this.post({ type: "gcal-auth", silent: true });
     if (this.on() && this.live()) setTimeout(() => this.sync(), 1200);
   },
   /* ── 로그인(토큰) ── */
   loadGis() {
+    if (this.native()) return Promise.resolve();
     if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
     return this._gis || (this._gis = new Promise((res, rej) => {
       const s = document.createElement("script"); s.src = "https://accounts.google.com/gsi/client"; s.async = true;
@@ -54,12 +59,14 @@ const GCal = {
   /* 사용자가 누른 순간에 바로 불러야 팝업이 막히지 않는다 */
   connect() {
     if (!this.clientId()) { CalSync.open(); return; }
+    if (this.native()) { this.post({ type: "gcal-auth", silent: this.st().on }); return; }
     if (!(window.google && google.accounts && google.accounts.oauth2)) { this.loadGis().then(() => App.toast("calendar", "준비됐어요. 한 번 더 눌러 주세요")).catch(e => App.toast("alert", e.message)); return; }
     const st = this.st();
     this.client().requestAccessToken({ prompt: st.on ? "" : "consent", login_hint: st.email || undefined });
   },
   /* 선택 기능: 내 구글 일정을 ORBIT에 함께 보기 위한 읽기 권한을 추가로 요청 */
   enableRead() {
+    if (this.native()) { this._wantRead = true; this.post({ type: "gcal-auth", read: true }); return; }
     if (!(window.google && google.accounts && google.accounts.oauth2)) { this.loadGis().then(() => App.toast("calendar", "준비됐어요. 한 번 더 눌러 주세요")).catch(e => App.toast("alert", e.message)); return; }
     this._wantRead = true;
     this.client().requestAccessToken({ scope: [...this.SCOPES, this.READ].join(" "), prompt: "consent", login_hint: this.st().email || undefined });
@@ -73,6 +80,21 @@ const GCal = {
     if (this._wantRead) { this._wantRead = false; st.show = this.canRead(); if (!st.show) App.toast("alert", "일정 보기 권한이 체크되지 않아 켜지 못했어요"); }
     Store.save();
     this.sync(true).then(ok => { if (ok && first) App.toast("calendar", `Google 캘린더에 연결했어요 · 「ORBIT 할 일」에 ${Object.keys(st.map).length}개를 넣었어요`); });
+  },
+  /* iOS 앱이 보내 주는 결과 */
+  onNative(m) {
+    if (!m) return;
+    if (m.type === "token") {
+      if (!(m.scope || "").includes("calendar.app.created")) { App.toast("alert", "「ORBIT 할 일」 캘린더를 만들 권한이 필요해요. 다시 연결하면서 체크해 주세요"); this.paint(); return; }
+      this.token = m.access_token; this.exp = Date.now() + (Number(m.expires_in) || 3300) * 1000; this.scope = m.scope;
+      try { sessionStorage.setItem("orbit-gtoken", JSON.stringify({ t: this.token, exp: this.exp, s: this.scope })); } catch (_) { /* 저장소 없음 */ }
+      const st = this.st(), first = !st.on; st.on = true; this.err = ""; if (m.email) st.email = m.email;
+      if (this._wantRead) { this._wantRead = false; st.show = this.canRead(); if (!st.show) App.toast("alert", "일정 보기 권한이 체크되지 않아 켜지 못했어요"); }
+      Store.save();
+      this.sync(true).then(ok => { if (ok && first) App.toast("calendar", `Google 캘린더에 연결했어요 · 「ORBIT 할 일」에 ${Object.keys(st.map).length}개를 넣었어요`); });
+    } else if (m.type === "cancel") { this._wantRead = false; App.toast("alert", "Google 연결이 취소됐어요"); this.paint(); }
+    else if (m.type === "none") { this.paint(); }
+    else if (m.type === "error") { this._wantRead = false; App.toast("alert", "Google 연결 중 문제가 생겼어요: " + (m.message || "")); this.paint(); }
   },
   forget() { this.token = null; this.exp = 0; try { sessionStorage.removeItem("orbit-gtoken"); } catch (_) { /* 없음 */ } },
   /* ── 구글 캘린더 API ── */
@@ -192,7 +214,7 @@ const GCal = {
   schedule() { if (!this.on()) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.sync(), 1800); },
   async sync(force) {
     const st = this.st(); if (!this.on()) return false;
-    if (!this.live()) { this.paint(); return false; }
+    if (!this.live()) { if (this.native() && (!this._askT || Date.now() - this._askT > 30000)) { this._askT = Date.now(); this.post({ type: "gcal-auth", silent: true }); } this.paint(); return false; }
     if (this.busy) { this.again = true; return false; }
     this.busy = true; this.paint(); let ok = false;
     try {
@@ -254,7 +276,8 @@ const GCal = {
   headClick() { const s = this.state(); if (s === "ok") this.sync(); else if (s === "expired") this.connect(); else if (s !== "busy") CalSync.open(); },
   disconnect() {
     Modal.confirm({ title: "Google 캘린더 연결 끊기", desc: "자동으로 함께 바뀌지 않게 돼요. 구글 캘린더의 「ORBIT 할 일」 캘린더와 일정은 그대로 남아요(필요 없으면 구글에서 지우면 돼요).", ok: "연결 끊기", onOk: () => {
-      try { if (this.token && window.google && google.accounts) google.accounts.oauth2.revoke(this.token, () => {}); } catch (_) { /* 무시 */ }
+      if (this.native()) this.post({ type: "gcal-signout" });
+      else try { if (this.token && window.google && google.accounts) google.accounts.oauth2.revoke(this.token, () => {}); } catch (_) { /* 무시 */ }
       this.forget(); const st = this.st(); st.on = false; st.map = {}; st.syncToken = null; this.listed = false; this.err = ""; this.ext = []; this.extRange = null;
       try { localStorage.removeItem("orbit-gcal-ext"); } catch (_) { /* 없음 */ }
       Store.save(); this.paint(); Calendar.render(); if (Board.el) Board.render(); App.toast("calendar", "Google 캘린더 연결을 끊었어요");

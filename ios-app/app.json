@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "ORBIT",
+    "slug": "orbit-space-todo",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#05060a",
+    "ios": {
+      "bundleIdentifier": "com.craving.orbit",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "config": { "usesNonExemptEncryption": false },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "WKAppBoundDomains": ["orbit-space-todo.vercel.app"],
+        "CFBundleDevelopmentRegion": "ko",
+        "CFBundleAllowMixedLocalizations": true
+      }
+    },
+    "plugins": [
+      ["@react-native-google-signin/google-signin", { "iosUrlScheme": "com.googleusercontent.apps.57190288153-kk82o0on3ma0nbgce3s0ck8jacliquov" }],
+      "expo-status-bar",
+      ["expo-splash-screen", { "backgroundColor": "#05060a", "image": "./assets/splash-icon.png", "imageWidth": 180, "dark": { "backgroundColor": "#05060a", "image": "./assets/splash-icon.png" } }]
+    ]
+  }
+}
