@@ -329,6 +329,7 @@ const Modal = {
       <p class="desc" style="margin:12px 0 0">입력 팁: <b>#행성이름</b>으로 행성을, <b>!1 !2 !3</b>(또는 !높음 !보통 !낮음)으로 우선순위를 정해요. 「내일」「다음주 금요일」「오후 3시」「12/25」 같은 날짜와 시간도 알아들어요.</p>
       <h4>이미지 출처</h4>
       <p class="credits">행성·태양·은하수 텍스처는 <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>의 자료(CC BY 4.0)예요. NASA 탐사선과 관측 자료를 바탕으로 만든 지도입니다.</p>
+      <p class="credits" style="margin-top:8px"><a href="about.html" target="_blank" rel="noopener">ORBIT 소개</a> · <a href="privacy.html" target="_blank" rel="noopener">개인정보처리방침</a></p>
       <div class="m-actions"><button type="button" class="btn" id="mClose">닫기</button></div>`);
     const c = this.card, on = (s, f) => { const el = c.querySelector(s); if (el) el.addEventListener("click", f); };
     c.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => this.planet(b.dataset.edit)));

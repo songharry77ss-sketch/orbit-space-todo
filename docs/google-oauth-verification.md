@@ -1,0 +1,47 @@
+# Google OAuth 앱 인증 준비 자료
+
+ORBIT의 Google 캘린더 연동을 누구나 경고 없이 쓰게 하려면 Google 인증 플랫폼에서 앱을 **프로덕션으로 게시**하고, 민감한 범위가 있으면 **인증(검토)을 신청**합니다. 아래는 신청서에 그대로 쓰는 값과 문장입니다.
+
+## 신청서 값
+
+| 항목 | 값 |
+| --- | --- |
+| 앱 이름 | ORBIT |
+| 앱 홈페이지 | https://orbit-space-todo.vercel.app/about.html |
+| 개인정보처리방침 | https://orbit-space-todo.vercel.app/privacy.html |
+| 승인된 도메인 | orbit-space-todo.vercel.app (vercel.app 은 공개 접미사 목록에 있어 이 주소가 하나의 도메인으로 취급됨) |
+| 도메인 소유 확인 | Google Search Console → URL 접두어 `https://orbit-space-todo.vercel.app/` → HTML 태그 방식. 받은 `google-site-verification` 메타 태그를 index.html · about.html `<head>` 에 넣고 배포 |
+| 승인된 JavaScript 원본 | https://orbit-space-todo.vercel.app · https://songharry77ss-sketch.github.io · http://localhost:5173 |
+
+## 범위별 사용 이유 (영어로 제출)
+
+**https://www.googleapis.com/auth/calendar.app.created**
+> ORBIT is a to-do app. When the user connects Google Calendar, ORBIT creates one secondary calendar named "ORBIT 할 일" in the user's account and keeps the user's tasks that have due dates in sync with events in that calendar only: creating, updating and deleting those events when the user adds, edits, completes or deletes tasks in ORBIT, and reading changes the user makes to those events in Google Calendar (date or title changes, deletions, new events) so that ORBIT reflects them. ORBIT never modifies any other calendar.
+
+**https://www.googleapis.com/auth/calendar.events.readonly**
+> ORBIT shows the user's existing Google Calendar events next to their tasks in ORBIT's month view, week view and "today" board, so the user can plan tasks around their schedule. Events are only read and displayed in the user's browser; they are never modified, stored on a server or shared. The user can turn this display off in ORBIT's calendar settings.
+
+**https://www.googleapis.com/auth/calendar.calendarlist.readonly**
+> ORBIT reads the user's calendar list to find the "ORBIT 할 일" calendar it created earlier (for example when the user connects from a second device, so no duplicate calendar is created), and to choose which calendars' events to display with their colors. The list is only read.
+
+공통 설명:
+> ORBIT is a client-side web app with no backend server. All Google API calls are made directly from the user's browser with a short-lived access token obtained through Google Identity Services. No Google user data is transmitted to or stored by the developer. Use of Google user data complies with the Google API Services User Data Policy, including the Limited Use requirements.
+
+## 시연 영상 대본 (화면 녹화 후 YouTube에 '일부 공개'로 올려 링크 제출)
+
+영어 자막이나 영어 설명이 있으면 좋습니다. 1~3분이면 충분합니다.
+
+1. https://orbit-space-todo.vercel.app/about.html 을 보여 주고 「ORBIT 열기」.
+2. 할 일 두세 개에 마감일을 넣는 장면.
+3. 캘린더 탭 → 「캘린더 연동」 → 「Google 계정으로 연결」. **Google 동의 화면이 나오면 주소창의 `client_id=…` 가 보이도록** 잠시 멈추고, 앱 이름 ORBIT과 요청 범위가 보이게 합니다.
+4. 허용 후 ORBIT 캘린더에 Google 일정(읽기 전용 칩)이 함께 보이는 장면 → events.readonly 사용.
+5. Google 캘린더(calendar.google.com)를 열어 「ORBIT 할 일」 캘린더와 할 일 일정이 생긴 장면 → app.created 사용.
+6. Google 캘린더에서 그 일정 날짜를 옮긴 뒤 ORBIT으로 돌아와 날짜가 바뀐 장면 → app.created 의 읽기 · 반영.
+7. ORBIT에서 할 일을 완료하면 Google 일정 제목에 ✓ 가 붙는 장면.
+8. 「연결 끊기」를 보여 주며 마무리.
+
+## 참고
+
+- 민감한 범위의 검토는 보통 며칠~몇 주 걸리고, Google이 등록 이메일로 추가 질문을 보낼 수 있습니다.
+- 검토가 끝나기 전에도 앱을 프로덕션으로 게시해 두면 사용자 100명까지는 「확인되지 않은 앱」 안내를 거쳐 쓸 수 있습니다.
+- 로고를 올리면 브랜드 인증이 추가로 필요하니, 처음에는 로고 없이 신청하는 편이 빠릅니다.
