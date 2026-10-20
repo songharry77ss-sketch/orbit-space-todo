@@ -130,8 +130,9 @@ const CalSync = {
   open() {
     const all = Store.tasks().filter(t => t.due), open = all.filter(t => t.status !== "done");
     Modal.show(`<h3>캘린더 연동</h3>
-      <p class="desc">구글 · 애플 · 아웃룩 · 삼성 캘린더와 할 일을 주고받아요. 표준 캘린더 파일(.ics)로 주고받아서 계정을 연결하지 않아도 돼요.</p>
-      <h4>ORBIT 할 일 → 내 캘린더</h4>
+      <p class="desc">구글 캘린더는 계정을 연결하면 자동으로 함께 바뀌어요. 애플 · 아웃룩 · 삼성 캘린더는 표준 캘린더 파일(.ics)로 주고받아요.</p>
+      <div id="csG"></div>
+      <h4>파일로 보내기 (.ics)</h4>
       <div class="cs-seg" role="radiogroup" aria-label="보낼 범위">
         <button type="button" data-scope="open" role="radio">남은 할 일 <b class="num">${open.length}</b></button>
         <button type="button" data-scope="all" role="radio">완료 포함 <b class="num">${all.length}</b></button>
@@ -145,7 +146,7 @@ const CalSync = {
         <li><b>삼성 캘린더</b><span>받은 파일을 열고 캘린더 앱으로 가져오기</span></li>
       </ul>
       <p class="cs-note">마감일이 있는 할 일만 들어가고, 시간이 없으면 하루 종일 일정이 돼요. 같은 파일을 다시 넣으면 애플 · 아웃룩은 기존 일정을 고쳐 쓰고, 구글은 중복될 수 있어요. 할 일 하나만 보내려면 상세 화면의 「캘린더에 추가」를 쓰세요.</p>
-      <h4>내 캘린더 → ORBIT 할 일</h4>
+      <h4>파일로 가져오기 (.ics)</h4>
       <div id="csImp"></div>
       <div class="m-actions"><button type="button" class="btn" id="csClose">닫기</button></div>`);
     const c = Modal.card;
@@ -159,7 +160,7 @@ const CalSync = {
       this.save(`orbit-${U.today()}.ics`, this.ics(list)); App.toast("download", `할 일 ${list.length}개를 .ics 파일로 받았어요`);
     });
     c.querySelector("#csClose").addEventListener("click", () => Modal.close());
-    this.parsed = null; this.renderImport();
+    this.parsed = null; this.renderImport(); GCal.renderSection(); if (GCal.clientId()) GCal.loadGis().catch(() => {});
   },
   renderImport() {
     const box = Modal.card && Modal.card.querySelector("#csImp"); if (!box) return;

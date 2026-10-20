@@ -954,3 +954,69 @@ body:has(.focus-chip:not([hidden])) .board-pill, body.sheet-open .board-pill { d
 .cal-add button { height: 26px; padding: 0 9px; border-radius: 6px; font-size: 12px; color: var(--ink-2); border: 1px solid var(--line-2); transition: border-color 0.12s, color 0.12s; }
 .cal-add button:hover { color: var(--ink); border-color: var(--line-3); }
 @media (max-width: 639.98px) { .cs-how li { grid-template-columns: 1fr; gap: 2px; } }
+
+/* ───────── 구글 캘린더 연결 ───────── */
+.gc-btn { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px 0 9px; margin-right: 6px; border-radius: 8px; font-size: 12.5px; font-weight: 560; color: var(--ink-2); border: 1px solid var(--line-2); transition: border-color 0.12s, color 0.12s, background 0.12s; }
+.gc-btn:hover { color: var(--ink); border-color: var(--line-3); background: var(--raise); }
+.gc-btn .g-logo { flex: none; }
+.gc-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--ink-4); }
+.s-ok .gc-dot, .gc-dot.s-ok { background: var(--ok); box-shadow: 0 0 0 3px rgba(99, 210, 149, 0.16); }
+.s-busy .gc-dot, .gc-dot.s-busy { background: var(--sol); animation: pulse 1.2s ease-out infinite; }
+.s-expired .gc-dot, .gc-dot.s-expired { background: var(--imp); }
+.s-error .gc-dot, .gc-dot.s-error { background: var(--late); }
+.gc-btn.s-expired { color: var(--imp); border-color: rgba(242, 196, 107, 0.4); }
+.gc-card { padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, 0.025); margin-bottom: 6px; }
+.gc-card.on { border-color: rgba(99, 210, 149, 0.28); }
+.gc-top { display: flex; align-items: center; gap: 12px; }
+.gc-top > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gc-top b { font-size: 14px; font-weight: 650; color: var(--ink); }
+.gc-top span { font-size: 12.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+.gc-pts { margin: 12px 0 14px; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+.gc-connect { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 40px; padding: 0 18px 0 14px; border-radius: 9px; font-size: 14px; font-weight: 600; color: #1f1f1f; background: #ffffff; border: 1px solid #dadce0; transition: background 0.12s, box-shadow 0.12s; }
+.gc-connect:hover { background: #f6f8fb; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); }
+.gc-connect .g-logo { width: 18px; height: 18px; }
+.gc-connect.sm { height: 32px; padding: 0 12px 0 10px; font-size: 13px; }
+.gc-err { margin: 10px 0 0; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: var(--late); background: rgba(240, 113, 125, 0.08); }
+.gc-card .cs-row { margin: 14px 0 12px; }
+.gc-card .btn-row a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.gc-key { display: flex; gap: 8px; margin-top: 10px; }
+.gc-key input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--raise); color: var(--ink); font: inherit; font-size: 12.5px; outline: 0; }
+.gc-key input:focus { border-color: var(--line-3); }
+/* 캘린더 · 보드 속 구글 일정(읽기 전용): 테두리만 있는 칩으로 할 일과 구분 */
+.cal-ev { display: flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 4px; font-size: 11px; white-space: nowrap; overflow: hidden; color: var(--ink-2); border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 10%, transparent); cursor: pointer; flex-shrink: 0; }
+.cal-ev .t { overflow: hidden; text-overflow: ellipsis; }
+.cal-ev:hover { background: color-mix(in srgb, var(--c) 20%, transparent); color: var(--ink); }
+.wk-ev { display: flex; align-items: baseline; gap: 7px; flex: none; padding: 6px 8px; border-radius: 6px; font-size: 12px; color: var(--ink-2); border-left: 3px solid var(--c); background: color-mix(in srgb, var(--c) 9%, transparent); cursor: pointer; transition: background 0.12s; }
+.wk-ev:hover { background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--ink); }
+.wk-ev .tm { flex: none; font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.wk-ev .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-ev { flex: none; padding: 2px 0 6px; border-bottom: 1px solid var(--line); }
+.b-ev .b-sh { gap: 6px; color: var(--ink-3); }
+.b-evr { display: flex; align-items: center; gap: 9px; width: 100%; height: 30px; padding: 0 14px; text-align: left; font-size: 12.5px; color: var(--ink-2); transition: background 0.12s; }
+.b-evr:hover { background: var(--raise-2); color: var(--ink); }
+.b-evr .tm { flex: none; min-width: 52px; padding-left: 8px; border-left: 3px solid var(--c); font-size: 11.5px; color: var(--ink-3); }
+.b-evr .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-evm { padding: 2px 14px 0 39px; font-size: 11.5px; color: var(--ink-4); }
+@media (max-width: 639.98px) {
+  .gc-btn { width: 30px; padding: 0; justify-content: center; margin-right: 2px; position: relative; }
+  .gc-btn .lbl { display: none; }
+  .gc-btn .gc-dot { position: absolute; right: 3px; top: 3px; width: 6px; height: 6px; }
+  .cal-ev { height: 4px; padding: 0; border: 0; border-radius: 2px; background: color-mix(in srgb, var(--c) 60%, transparent); }
+  .cal-ev .t { display: none; }
+  .gc-key { flex-direction: column; }
+}
+.gc-card .btn-row a.btn { color: var(--ink-2); }
+.gc-card .btn-row a.btn:hover { color: var(--ink); }
+.cal-head > div:first-child { min-width: 0; }
+.cal-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-nav { flex: none; }
+.pill-btn { white-space: nowrap; }
+@media (max-width: 639.98px) {
+  .cal-head { gap: 8px; }
+  .cal-title { font-size: 15px; }
+  .cal-nav { gap: 4px; }
+  .cal-nav .icon-btn.sm { width: 28px; height: 28px; }
+  #calToday { height: 28px; padding: 0 8px; font-size: 12.5px; }
+  .gc-btn { height: 28px; width: 28px; }
+  .cal-seg button { height: 24px; min-width: 28px; padding: 0 7px; }
+}

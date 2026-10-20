@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORBIT 개인정보처리방침</title>
+<meta name="description" content="ORBIT 우주 할 일 앱의 개인정보처리방침과 Google 캘린더 데이터 사용 방식">
+<style>
+  :root { color-scheme: dark; --bg: #05060a; --ink: #eceef3; --ink-2: #aeb4c1; --ink-3: #747b8b; --line: rgba(255,255,255,.09); --sol: #f4a259; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.75 "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 56px 20px 80px; }
+  h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; }
+  .sub { margin: 0 0 36px; color: var(--ink-3); font-size: 13.5px; }
+  h2 { margin: 36px 0 10px; padding-top: 22px; border-top: 1px solid var(--line); font-size: 16px; }
+  p, li { color: var(--ink-2); }
+  ul { padding-left: 20px; }
+  b { color: var(--ink); font-weight: 620; }
+  code { font-size: 13px; color: var(--ink); background: rgba(255,255,255,.06); padding: 1px 6px; border-radius: 5px; }
+  a { color: var(--sol); }
+</style>
+</head>
+<body>
+<main>
+  <h1>ORBIT 개인정보처리방침</h1>
+  <p class="sub">ORBIT 우주 할 일 · 시행일 2026년 10월 20일</p>
+
+  <h2>한 줄 요약</h2>
+  <p>ORBIT은 서버가 없는 앱입니다. 할 일은 사용하는 기기의 브라우저에만 저장되고, 운영자가 따로 모으거나 보관하는 개인정보는 없습니다.</p>
+
+  <h2>저장하는 정보</h2>
+  <ul>
+    <li><b>할 일과 행성(카테고리)</b>: 제목, 메모, 날짜, 우선순위 등은 브라우저 저장소(localStorage)에만 저장됩니다. 다른 곳으로 전송되지 않습니다.</li>
+    <li><b>Google 연결 정보</b>: Google 캘린더를 연결하면 접근 토큰이 브라우저 탭에만 잠시(최대 1시간) 보관되고, 연결된 캘린더 아이디와 동기화 기록이 브라우저 저장소에 남습니다.</li>
+    <li>쿠키나 광고 · 분석 추적 도구를 쓰지 않습니다.</li>
+  </ul>
+
+  <h2>Google 캘린더 데이터 사용</h2>
+  <p>사용자가 직접 「Google 계정으로 연결」을 누른 경우에만 아래 권한을 요청하며, 브라우저에서 Google 캘린더 API와 직접 통신합니다. 데이터는 ORBIT 운영자를 포함한 제3자에게 전달되지 않습니다.</p>
+  <ul>
+    <li><code>calendar.app.created</code>: 사용자 계정에 「ORBIT 할 일」 캘린더를 만들고, 그 캘린더 안의 일정만 만들고 고치고 지웁니다. 사용자의 다른 캘린더는 바꾸지 않습니다.</li>
+    <li><code>calendar.events.readonly</code>: 사용자의 다른 캘린더 일정을 읽어 ORBIT 화면에 함께 보여 줍니다. 읽기만 합니다.</li>
+    <li><code>calendar.calendarlist.readonly</code>: 어떤 캘린더가 있는지 확인해 「ORBIT 할 일」 캘린더를 찾고 일정 색을 맞춥니다.</li>
+  </ul>
+  <p>Google에서 받은 정보는 위 기능에만 쓰며, 광고나 다른 목적으로 쓰거나 판매하지 않습니다. ORBIT의 Google 사용자 데이터 사용은 <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API 서비스 사용자 데이터 정책</a>의 제한적 사용 요건을 따릅니다.</p>
+
+  <h2>연결 끊기와 삭제</h2>
+  <ul>
+    <li>ORBIT 캘린더 화면 → 「캘린더 연동」 → 「연결 끊기」로 언제든 연결을 끊을 수 있습니다.</li>
+    <li><a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google 계정의 서드파티 앱 접근 관리</a>에서도 권한을 없앨 수 있습니다.</li>
+    <li>브라우저에 저장된 데이터는 설정 → 데이터 → 「모두 지우기」 또는 브라우저 사이트 데이터 삭제로 지워집니다. 「ORBIT 할 일」 캘린더는 Google 캘린더에서 직접 지울 수 있습니다.</li>
+  </ul>
+
+  <h2>문의</h2>
+  <p><a href="https://github.com/songharry77ss-sketch/orbit-space-todo/issues" target="_blank" rel="noopener">GitHub 이슈</a>로 문의해 주세요.</p>
+  <p><a href="./">← ORBIT으로 돌아가기</a></p>
+</main>
+</body>
+</html>

@@ -8,7 +8,8 @@ const App = {
   init() {
     Store.load(); this.day = U.today();
     document.querySelectorAll("[data-ico]").forEach(el => { el.outerHTML = ico(el.dataset.ico, 18); });
-    Scene.init(); Panel.init(); Calendar.init(); QuickAdd.init(); Palette.init(); Board.init(); Now.init(); ListView.init();
+    Scene.init(); Panel.init(); Calendar.init(); QuickAdd.init(); Palette.init(); Board.init(); Now.init(); ListView.init(); GCal.init();
+    $("#gcalBtn").addEventListener("click", () => GCal.headClick());
     document.querySelectorAll(".seg-btn").forEach(b => b.addEventListener("click", () => this.setView(b.dataset.view)));
     $("#searchBtn").addEventListener("click", () => Palette.open());
     $("#settingsBtn").addEventListener("click", () => Modal.settings());

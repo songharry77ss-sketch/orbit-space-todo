@@ -69,14 +69,15 @@ const Calendar = {
       const ds = U.dateStr(d), list = (byDate.get(ds) || []).sort(Store.sortTasks), other = d.getMonth() !== m, dn = list.filter(t => t.status === "done").length;
       if (!other) { total += list.length; done += dn; }
       const cls = ["cal-cell", other && "other", ds === today && "today", ds === this.selected && "sel", d.getDay() === 0 && "sun", d.getDay() === 6 && "sat"].filter(Boolean).join(" ");
-      const shown = list.slice(0, max);
+      const evs = GCal.eventsOn(ds), all = [...evs, ...list], shown = all.slice(0, max);
       html += `<div class="${cls}" data-date="${ds}" role="button" tabindex="-1" aria-label="${U.fmtDate(ds)} 할 일 ${list.length}개">
         <div class="cal-day"><span class="d">${d.getDate()}</span>${list.length ? `<span class="cnt ${dn === list.length ? "alldone" : ""}">${dn}/${list.length}</span>` : ""}</div>
-        ${shown.map(t => { const p = Store.planet(t.planetId); return `<div class="cal-task ${t.status} ${t.priority === 1 ? "p1" : ""}" draggable="true" data-id="${t.id}" style="--c:${p ? pColor(p) : "#fff"}" title="${U.esc(t.title)}">${t.priority === 1 ? prioSvg(1, 10) : ""}<span class="t">${U.esc(t.title)}</span></div>`; }).join("")}
-        ${list.length > max ? `<div class="cal-more">+${list.length - max}</div>` : ""}
+        ${shown.map(t => { if (t.cal !== undefined) return `<div class="cal-ev" data-ev="${U.esc(t.id)}" style="--c:${t.color}" title="${U.esc(t.cal)} · ${U.esc(t.title)}"><span class="t">${t.time ? U.fmtTime(t.time) + " " : ""}${U.esc(t.title)}</span></div>`; const p = Store.planet(t.planetId); return `<div class="cal-task ${t.status} ${t.priority === 1 ? "p1" : ""}" draggable="true" data-id="${t.id}" style="--c:${p ? pColor(p) : "#fff"}" title="${U.esc(t.title)}">${t.priority === 1 ? prioSvg(1, 10) : ""}<span class="t">${U.esc(t.title)}</span></div>`; }).join("")}
+        ${all.length > max ? `<div class="cal-more">+${all.length - max}</div>` : ""}
       </div>`;
     }
     this.grid.innerHTML = html;
+    GCal.need(U.dateStr(start), U.addDays(U.dateStr(start), rows * 7 - 1));
     this.sub.textContent = total ? `이번 달 ${total}개 중 ${done}개 완료` : "이번 달에 예정된 할 일이 없어요";
   },
   /* 주간: 7일을 열로(휴대폰은 날짜별 세로 목록). 시간 있는 일 먼저, 시간순 */
@@ -85,7 +86,8 @@ const Calendar = {
     const s0 = this.weekStart(this.anchor), days = [0, 1, 2, 3, 4, 5, 6].map(i => U.addDays(s0, i)), today = U.today(), by = this.byDate(), narrow = window.innerWidth < 640;
     const a = U.parseDate(days[0]), b = U.parseDate(days[6]), ym = d => `${d.getMonth() + 1}월 ${d.getDate()}일`;
     const range = a.getMonth() === b.getMonth() ? `${ym(a)} – ${b.getDate()}일` : `${ym(a)} – ${ym(b)}`;
-    this.title.textContent = narrow || a.getFullYear() === new Date().getFullYear() ? range : `${a.getFullYear()}년 ${range}`;
+    const short = a.getMonth() === b.getMonth() ? `${a.getMonth() + 1}월 ${a.getDate()}–${b.getDate()}일` : `${a.getMonth() + 1}.${a.getDate()}–${b.getMonth() + 1}.${b.getDate()}`;
+    this.title.textContent = narrow ? short : a.getFullYear() === new Date().getFullYear() ? range : `${a.getFullYear()}년 ${range}`;
     const order = (x, y) => ((x.status === "done") - (y.status === "done")) || ((!x.time) - (!y.time)) || (x.time || "").localeCompare(y.time || "") || Store.sortTasks(x, y);
     const keepTop = this.grid.scrollTop, keep = {}; this.grid.querySelectorAll(".wk-col").forEach(c => { keep[c.dataset.date] = c.querySelector(".wk-list").scrollTop; });
     let total = 0, done = 0;
@@ -95,7 +97,7 @@ const Calendar = {
       const cls = ["wk-col", ds === today && "today", ds < today && "past", ds === this.selected && "sel", d.getDay() === 0 && "sun", d.getDay() === 6 && "sat"].filter(Boolean).join(" ");
       return `<section class="${cls}" data-date="${ds}">
         <button type="button" class="wk-head" data-act="day" aria-label="${U.fmtDate(ds)} 하루 보기"><span class="wd">${WEEKDAYS[d.getDay()]}</span><span class="d">${d.getDate()}</span>${ds === today ? `<span class="tdy">오늘</span>` : ""}${list.length ? `<span class="cnt ${dn === list.length ? "alldone" : ""}">${dn}/${list.length}</span>` : ""}</button>
-        <div class="wk-list">${list.map(t => this.card(t)).join("")}${this.addDate === ds
+        <div class="wk-list">${GCal.eventsOn(ds).map(ev => `<div class="wk-ev" data-ev="${U.esc(ev.id)}" style="--c:${ev.color}" title="${U.esc(ev.cal)} · 누르면 구글 캘린더에서 열려요"><span class="tm">${ev.time ? U.fmtTime(ev.time) : "종일"}</span><span class="t">${U.esc(ev.title)}</span></div>`).join("")}${list.map(t => this.card(t)).join("")}${this.addDate === ds
           ? `<div class="wk-addrow"><input id="calAdd" type="text" placeholder="새 할 일 · Enter" enterkeyhint="send" autocomplete="off" aria-label="${U.fmtDate(ds)}에 할 일 추가"></div>`
           : `<button type="button" class="wk-add" data-act="add" aria-label="${U.fmtDate(ds)}에 할 일 추가">${ico("plus", 14)}<span>추가</span></button>`}</div>
       </section>`;
@@ -104,6 +106,7 @@ const Calendar = {
     this.grid.querySelectorAll(".wk-col").forEach(c => { if (keep[c.dataset.date]) c.querySelector(".wk-list").scrollTop = keep[c.dataset.date]; });
     this.grid.scrollTop = keepTop;
     if (narrow && this._scrolled !== s0) { this._scrolled = s0; const td = this.grid.querySelector(".wk-col.today"); if (td) this.grid.scrollTop += td.getBoundingClientRect().top - this.grid.getBoundingClientRect().top; }
+    GCal.need(days[0], days[6]);
     const cur = days.includes(today) ? "이번 주" : "이 주";
     this.sub.textContent = total ? `${cur} ${total}개 중 ${done}개 완료` : `${cur}에 예정된 할 일이 없어요`;
     if (this.addDate) this.grid.querySelector("#calAdd")?.focus();
@@ -129,6 +132,7 @@ const Calendar = {
     document.getElementById("calSync").addEventListener("click", () => CalSync.open());
   },
   onClick(e) {
+    const ev = e.target.closest(".cal-ev, .wk-ev"); if (ev) { e.stopPropagation(); GCal.openEvent(ev.dataset.ev); return; }
     const act = e.target.closest("[data-act]"), task = e.target.closest(".cal-task, .wk-task"), col = e.target.closest(".cal-cell, .wk-col");
     if (act && act.dataset.act === "check" && task) {
       e.stopPropagation(); const t = Store.task(task.dataset.id); if (!t) return;

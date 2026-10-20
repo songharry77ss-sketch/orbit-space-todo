@@ -34,6 +34,8 @@ const Board = {
     const sum = [high ? `<span class="b-chip" style="--pc:${PRIO[1].color}">${prioSvg(1, 12)}높음 ${high}</span>` : "", late ? `<span class="b-chip late">지남 ${late}</span>` : ""].join("");
     let html = `<div class="b-head"><button type="button" class="b-title" data-act="collapse" aria-expanded="${!collapsed}" title="${narrow ? "닫기" : collapsed ? "펼치기" : "접기"}">${ico(collapsed ? "chevRight" : "chevDown", 15)}<span>${title}</span><span class="b-count num">${list.length}</span></button><div class="b-sum">${sum}</div></div>`;
     if (doing.length) html += `<button type="button" class="b-now" data-act="now"><span class="f-dot"></span>집중 중 <b class="num">${doing.length}</b>개 · 아래 집중 바에서 진행 중</button>`;
+    const evs = GCal.eventsOn(U.today());
+    if (evs.length && !collapsed) html += `<div class="b-ev"><div class="b-sh">${GCal.G.replace('width="16" height="16"', 'width="12" height="12"')}오늘 구글 일정<span class="n num">${evs.length}</span></div>${evs.slice(0, 4).map(ev => `<button type="button" class="b-evr" data-act="ev" data-ev="${U.esc(ev.id)}" style="--c:${ev.color}" title="${U.esc(ev.cal)}"><span class="tm num">${ev.time ? U.fmtTime(ev.time) : "종일"}</span><span class="t">${U.esc(ev.title)}</span></button>`).join("")}${evs.length > 4 ? `<div class="b-evm">외 ${evs.length - 4}개</div>` : ""}</div>`;
     if (!collapsed) {
       html += `<div class="b-body">`;
       groups.forEach(([p, l]) => { html += `<div class="b-sec"><div class="b-sh" style="--pc:${PRIO[p].color}">${prioSvg(p, 13)}${p ? PRIO[p].ko : "우선순위 미정"}<span class="n num">${l.length}</span></div>${l.map(t => this.row(t)).join("")}</div>`; });
@@ -72,6 +74,7 @@ const Board = {
       case "prio": if (t) PrioMenu.open(b, t.priority || 0, v => Store.updateTask(id, { priority: v })); break;
       case "fire": if (!t) break; if (t.status === "doing") { Store.stopTask(id); App.toast("orbitBack", "궤도로 돌아왔어요"); } else { this.closeM(); App.startTask(id); } break;
       case "now": Now.pulse(); break;
+      case "ev": GCal.openEvent(b.dataset.ev); break;
       case "triage": Modal.triage(this.list().filter(x => x.status !== "doing" && !x.priority).map(x => x.id)); break;
     }
   },
