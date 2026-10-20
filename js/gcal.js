@@ -6,18 +6,21 @@
 "use strict";
 
 /* Google Cloud 콘솔에서 만든 「웹 애플리케이션」 OAuth 클라이언트 ID. 공개해도 되는 값이다(비밀 키 아님). README의 설정 방법 참고 */
-const GCAL_CLIENT_ID = "";
+const GCAL_CLIENT_ID = "57190288153-op2qmf54d449vmqoge7roc4r1hik4ooo.apps.googleusercontent.com";
 
 const GCal = {
-  SCOPES: ["https://www.googleapis.com/auth/calendar.app.created", "https://www.googleapis.com/auth/calendar.events.readonly", "https://www.googleapis.com/auth/calendar.calendarlist.readonly"],
+  /* 기본 연결은 Google이 「민감하지 않음」으로 분류한 두 권한만 쓴다 → 심사 · 경고 없이 누구나 연결 */
+  SCOPES: ["https://www.googleapis.com/auth/calendar.app.created", "https://www.googleapis.com/auth/calendar.calendarlist.readonly"],
+  /* 내 다른 일정 함께 보기(선택): 사용자가 켤 때만 따로 요청하는 읽기 권한 */
+  READ: "https://www.googleapis.com/auth/calendar.events.readonly",
   API: "https://www.googleapis.com/calendar/v3",
   token: null, exp: 0, scope: "", tc: null, busy: false, again: false, timer: null, err: "", listed: false,
   ext: [], extCals: [], extRange: null,
-  st() { const s = Store.state.settings; if (!s.gcal || typeof s.gcal !== "object") s.gcal = { on: false, calId: null, email: "", map: {}, syncToken: null, last: 0, show: true }; if (!s.gcal.map) s.gcal.map = {}; return s.gcal; },
+  st() { const s = Store.state.settings; if (!s.gcal || typeof s.gcal !== "object") s.gcal = { on: false, calId: null, email: "", map: {}, syncToken: null, last: 0, show: false }; if (!s.gcal.map) s.gcal.map = {}; return s.gcal; },
   clientId() { return GCAL_CLIENT_ID || Store.state.settings.gcalClientId || ""; },
   on() { return !!(this.clientId() && this.st().on); },
   live() { return !!this.token && this.exp > Date.now() + 30000; },
-  canRead() { return !this.scope || this.scope.includes("calendar.events.readonly"); },
+  canRead() { return !!this.scope && this.scope.includes("calendar.events.readonly"); },
   state() { if (!this.clientId()) return "nokey"; if (!this.st().on) return "off"; if (!this.live()) return "expired"; if (this.busy) return "busy"; return this.err ? "error" : "ok"; },
   init() {
     try { const t = JSON.parse(sessionStorage.getItem("orbit-gtoken") || "null"); if (t && t.exp > Date.now() + 60000) { this.token = t.t; this.exp = t.exp; this.scope = t.s || ""; } } catch (_) { /* 저장소 없음 */ }
@@ -55,12 +58,20 @@ const GCal = {
     const st = this.st();
     this.client().requestAccessToken({ prompt: st.on ? "" : "consent", login_hint: st.email || undefined });
   },
+  /* 선택 기능: 내 구글 일정을 ORBIT에 함께 보기 위한 읽기 권한을 추가로 요청 */
+  enableRead() {
+    if (!(window.google && google.accounts && google.accounts.oauth2)) { this.loadGis().then(() => App.toast("calendar", "준비됐어요. 한 번 더 눌러 주세요")).catch(e => App.toast("alert", e.message)); return; }
+    this._wantRead = true;
+    this.client().requestAccessToken({ scope: [...this.SCOPES, this.READ].join(" "), prompt: "consent", login_hint: this.st().email || undefined });
+  },
   onToken(r) {
     if (!r || r.error || !r.access_token) { App.toast("alert", "Google 연결이 취소됐어요"); this.paint(); return; }
     if (!google.accounts.oauth2.hasGrantedAllScopes(r, this.SCOPES[0])) { App.toast("alert", "「ORBIT 할 일」 캘린더를 만들 권한이 필요해요. 다시 연결하면서 체크해 주세요"); this.paint(); return; }
     this.token = r.access_token; this.exp = Date.now() + (Number(r.expires_in) || 3600) * 1000; this.scope = r.scope || this.SCOPES.join(" ");
     try { sessionStorage.setItem("orbit-gtoken", JSON.stringify({ t: this.token, exp: this.exp, s: this.scope })); } catch (_) { /* 저장소 없음 */ }
-    const st = this.st(), first = !st.on; st.on = true; this.err = ""; Store.save();
+    const st = this.st(), first = !st.on; st.on = true; this.err = "";
+    if (this._wantRead) { this._wantRead = false; st.show = this.canRead(); if (!st.show) App.toast("alert", "일정 보기 권한이 체크되지 않아 켜지 못했어요"); }
+    Store.save();
     this.sync(true).then(ok => { if (ok && first) App.toast("calendar", `Google 캘린더에 연결했어요 · 「ORBIT 할 일」에 ${Object.keys(st.map).length}개를 넣었어요`); });
   },
   forget() { this.token = null; this.exp = 0; try { sessionStorage.removeItem("orbit-gtoken"); } catch (_) { /* 없음 */ } },
@@ -266,7 +277,7 @@ const GCal = {
     }
     if (s === "off") {
       box.innerHTML = `<div class="gc-card">${top("Google 캘린더 바로 연결", "계정만 연결하면 할 일이 구글 캘린더와 함께 바뀌어요")}
-        <ul class="gc-pts"><li>구글 캘린더에 「ORBIT 할 일」 캘린더가 생기고, 마감일이 있는 할 일이 우선순위 색과 10분 전 알림으로 들어가요</li><li>ORBIT에서 고치면 구글에도, 구글에서 날짜 · 제목을 바꾸면 ORBIT에도 반영돼요. 그 캘린더에 일정을 만들면 ORBIT 할 일이 돼요</li><li>내 구글 일정도 ORBIT 캘린더와 오늘 보드에 함께 보여요 (읽기만 해요)</li></ul>
+        <ul class="gc-pts"><li>구글 캘린더에 「ORBIT 할 일」 캘린더가 생기고, 마감일이 있는 할 일이 우선순위 색과 10분 전 알림으로 들어가요</li><li>ORBIT에서 고치면 구글에도, 구글에서 날짜 · 제목을 바꾸면 ORBIT에도 반영돼요. 그 캘린더에 일정을 만들면 ORBIT 할 일이 돼요</li><li>원하면 내 구글 일정도 ORBIT 캘린더와 오늘 보드에 함께 볼 수 있어요 (선택 · 읽기만)</li></ul>
         <button type="button" class="gc-connect" id="gcConnect">${G}Google 계정으로 연결</button>
         <p class="cs-note">원래 있던 구글 일정은 바꾸거나 지우지 않아요. 연결은 언제든 끊을 수 있어요. · <a href="privacy.html" target="_blank" rel="noopener">개인정보처리방침</a></p></div>`;
       box.querySelector("#gcConnect").addEventListener("click", () => this.connect());
@@ -275,10 +286,13 @@ const GCal = {
     const n = Object.keys(st.map).length, stx = { ok: "동기화됨", busy: "동기화 중…", expired: "연결 시간이 지났어요", error: "문제가 있어요" }[s];
     box.innerHTML = `<div class="gc-card on">${top("Google 캘린더 연결됨", `${U.esc(st.email || "")}${st.email ? " · " : ""}${stx}`, true)}
       ${this.err ? `<p class="gc-err">${U.esc(this.err)}</p>` : ""}
-      <label class="toggle-row cs-row"><span>구글 일정도 ORBIT에 함께 보기</span><button type="button" class="switch ${st.show ? "on" : ""}" id="gcShow" role="switch" aria-checked="${st.show}" aria-label="구글 일정 함께 보기"></button></label>
+      <label class="toggle-row cs-row"><span>내 구글 일정도 ORBIT에 함께 보기${this.canRead() ? "" : '<br><small style="color:var(--ink-3)">켜면 일정 읽기 권한을 한 번 더 물어봐요. Google 심사 전이라 「확인되지 않은 앱」 안내가 나오면 고급 → ORBIT(으)로 이동</small>'}</span><button type="button" class="switch ${st.show && this.canRead() ? "on" : ""}" id="gcShow" role="switch" aria-checked="${st.show && this.canRead()}" aria-label="구글 일정 함께 보기"></button></label>
       <div class="btn-row">${s === "expired" ? `<button type="button" class="gc-connect sm" id="gcConnect">${G}다시 연결</button>` : `<button type="button" class="btn sm" id="gcSync" ${s === "busy" ? "disabled" : ""}>${ico("repeat", 15)}지금 동기화</button>`}<a class="btn sm" href="https://calendar.google.com/" target="_blank" rel="noopener">구글 캘린더 열기</a><button type="button" class="btn sm danger" id="gcOff">연결 끊기</button></div>
       <p class="cs-note">「ORBIT 할 일」 캘린더 · 함께 바뀌는 할 일 ${n}개 · 마지막 동기화 ${this.ago(st.last)}. Google 보안 정책상 연결은 1시간마다 새로 받아야 해서, 끊기면 캘린더 위 「다시 연결」을 한 번 눌러 주세요. 그동안 바뀐 내용은 다시 연결할 때 함께 올라가요.</p></div>`;
-    box.querySelector("#gcShow").addEventListener("click", () => { st.show = !st.show; Store.save(); this.renderSection(); if (st.show) this.sync(); else { Calendar.render(); if (Board.el) Board.render(); } });
+    box.querySelector("#gcShow").addEventListener("click", () => {
+      if (!this.canRead()) { this.enableRead(); return; }
+      st.show = !st.show; Store.save(); this.renderSection(); if (st.show) this.sync(); else { Calendar.render(); if (Board.el) Board.render(); }
+    });
     const c = box.querySelector("#gcConnect"); if (c) c.addEventListener("click", () => this.connect());
     const y = box.querySelector("#gcSync"); if (y) y.addEventListener("click", () => this.sync(true));
     box.querySelector("#gcOff").addEventListener("click", () => this.disconnect());

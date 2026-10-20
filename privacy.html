@@ -35,11 +35,11 @@
   </ul>
 
   <h2>Google 캘린더 데이터 사용</h2>
-  <p>사용자가 직접 「Google 계정으로 연결」을 누른 경우에만 아래 권한을 요청하며, 브라우저에서 Google 캘린더 API와 직접 통신합니다. 데이터는 ORBIT 운영자를 포함한 제3자에게 전달되지 않습니다.</p>
+  <p>사용자가 직접 「Google 계정으로 연결」을 누른 경우에만 아래 권한을 요청하며(세 번째 권한은 사용자가 「내 구글 일정도 함께 보기」를 켤 때만 따로 요청), 브라우저에서 Google 캘린더 API와 직접 통신합니다. 데이터는 ORBIT 운영자를 포함한 제3자에게 전달되지 않습니다.</p>
   <ul>
     <li><code>calendar.app.created</code>: 사용자 계정에 「ORBIT 할 일」 캘린더를 만들고, 그 캘린더 안의 일정만 만들고 고치고 지웁니다. 사용자의 다른 캘린더는 바꾸지 않습니다.</li>
-    <li><code>calendar.events.readonly</code>: 사용자의 다른 캘린더 일정을 읽어 ORBIT 화면에 함께 보여 줍니다. 읽기만 합니다.</li>
     <li><code>calendar.calendarlist.readonly</code>: 어떤 캘린더가 있는지 확인해 「ORBIT 할 일」 캘린더를 찾고 일정 색을 맞춥니다.</li>
+    <li><code>calendar.events.readonly</code>(선택): 사용자가 켠 경우에만, 다른 캘린더 일정을 읽어 ORBIT 화면에 함께 보여 줍니다. 읽기만 합니다.</li>
   </ul>
   <p>Google에서 받은 정보는 위 기능에만 쓰며, 광고나 다른 목적으로 쓰거나 판매하지 않습니다. ORBIT의 Google 사용자 데이터 사용은 <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API 서비스 사용자 데이터 정책</a>의 제한적 사용 요건을 따릅니다.</p>
 
