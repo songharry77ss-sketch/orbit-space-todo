@@ -1020,3 +1020,59 @@ body:has(.focus-chip:not([hidden])) .board-pill, body.sheet-open .board-pill { d
   .gc-btn { height: 28px; width: 28px; }
   .cal-seg button { height: 24px; min-width: 28px; padding: 0 7px; }
 }
+
+/* ── 시작 인트로: 태양이 켜지고 궤도가 그려진 뒤, 빛이 터지며 우주로 들어간다 (다시 열면 짧게, 누르면 바로 넘김) ── */
+.intro { --k: 1; position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; background: radial-gradient(120% 90% at 50% 44%, #0b0d16 0%, #05060b 55%, #020205 100%); transition: opacity 0.85s var(--ease) 0.15s; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.intro.quick { --k: 0.45; }
+.intro.out { opacity: 0; pointer-events: none; }
+.in-stars { position: absolute; inset: -12%; transition: transform 1.1s cubic-bezier(0.55, 0, 0.2, 1), opacity 0.9s; }
+.in-stars::before { content: ""; position: absolute; inset: 0; opacity: 0; animation: inStars calc(1.4s * var(--k)) ease-out forwards, inDrift 7s linear forwards;
+  background-image:
+    radial-gradient(1.2px 1.2px at 17% 23%, #fff 50%, transparent 52%), radial-gradient(1px 1px at 71% 12%, #dfe6ff 50%, transparent 52%),
+    radial-gradient(1.4px 1.4px at 38% 77%, #ffe9cf 50%, transparent 52%), radial-gradient(1px 1px at 86% 64%, #fff 50%, transparent 52%),
+    radial-gradient(0.9px 0.9px at 57% 41%, #cfd8ff 50%, transparent 52%), radial-gradient(1.1px 1.1px at 8% 58%, #fff 50%, transparent 52%);
+  background-size: 157px 163px, 233px 211px, 311px 287px, 199px 241px, 127px 139px, 271px 257px; }
+.intro.out .in-stars { transform: scale(1.7); opacity: 0; }
+.in-flash { position: absolute; left: 50%; top: 50%; width: 140vmax; height: 140vmax; margin: -70vmax 0 0 -70vmax; border-radius: 50%; opacity: 0; pointer-events: none; background: radial-gradient(closest-side, rgba(255, 244, 226, 0.95), rgba(255, 196, 132, 0.55) 22%, rgba(244, 162, 89, 0.14) 48%, transparent 72%); transform: scale(0.15); }
+.intro.out .in-flash { animation: inFlash 0.95s cubic-bezier(0.3, 0, 0.2, 1) forwards; }
+.in-core { position: relative; display: grid; place-items: center; transition: transform 0.95s cubic-bezier(0.6, 0, 0.25, 1), opacity 0.7s ease 0.2s; }
+.intro.out .in-core { transform: scale(7); opacity: 0; }
+/* 태양 뒤로 천천히 도는 빛줄기 */
+.in-core::before { content: ""; position: absolute; width: 190%; aspect-ratio: 1; border-radius: 50%; opacity: 0; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 196, 132, 0.16) 0deg 2.2deg, transparent 2.2deg 15deg);
+  -webkit-mask: radial-gradient(closest-side, #000 8%, rgba(0, 0, 0, 0.55) 34%, transparent 70%); mask: radial-gradient(closest-side, #000 8%, rgba(0, 0, 0, 0.55) 34%, transparent 70%);
+  animation: inRays calc(1.6s * var(--k)) ease calc(0.3s * var(--k)) forwards, inSpin 40s linear infinite; }
+@keyframes inRays { to { opacity: 1; } }
+@keyframes inSpin { to { transform: rotate(360deg); } }
+.in-mark { position: relative; display: block; width: min(300px, 64vw); height: auto; overflow: visible; }
+.in-glow, .in-sun { transform-box: fill-box; transform-origin: center; }
+.in-glow { opacity: 0; animation: inGlow calc(1.3s * var(--k)) var(--ease) calc(0.12s * var(--k)) forwards, inBreath 3.2s ease-in-out calc(1.4s * var(--k)) infinite alternate; }
+.in-sun { transform: scale(0); filter: drop-shadow(0 0 14px rgba(255, 178, 102, 0.8)) drop-shadow(0 0 42px rgba(244, 162, 89, 0.45)); animation: inSun calc(0.95s * var(--k)) cubic-bezier(0.3, 1.5, 0.5, 1) calc(0.08s * var(--k)) forwards; }
+.in-orbit { fill: none; stroke: rgba(236, 238, 243, 0.62); stroke-width: 1.1; stroke-dasharray: 1; stroke-dashoffset: 1; animation: inOrbit calc(1.05s * var(--k)) cubic-bezier(0.45, 0, 0.2, 1) calc(0.38s * var(--k)) forwards; }
+.in-moon { fill: #f1f3f8; opacity: 0; filter: drop-shadow(0 0 5px rgba(220, 230, 255, 0.9)); animation: inFade calc(0.45s * var(--k)) ease calc(0.95s * var(--k)) forwards; }
+.in-word { display: flex; margin-top: clamp(18px, 3.6vh, 30px); padding-left: 0.34em; font-family: var(--f-ui); font-weight: 800; font-size: clamp(34px, 7.4vw, 62px); line-height: 1; letter-spacing: 0.34em; color: #eef0f5; animation: inTrack calc(1.25s * var(--k)) cubic-bezier(0.2, 0.7, 0.1, 1) calc(0.62s * var(--k)) both; transition: opacity 0.4s ease, transform 0.6s var(--ease); }
+.in-word span { display: inline-block; opacity: 0; filter: blur(10px); transform: translateY(12px); background: linear-gradient(100deg, #eef0f5 0 38%, #ffd8ab 50%, #eef0f5 62% 100%) 120% 0 / 300% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: inLetter calc(0.8s * var(--k)) var(--ease) calc((0.7s + var(--i) * 0.065s) * var(--k)) forwards, inShine 1.3s ease-in-out calc((1.55s + var(--i) * 0.05s) * var(--k)) forwards; }
+.in-tag { margin-top: 14px; transition: opacity 0.35s ease, transform 0.6s var(--ease); }
+.in-tag span { display: block; font-size: clamp(13px, 1.9vw, 15.5px); font-weight: 500; letter-spacing: 0.02em; color: var(--ink-2); opacity: 0; transform: translateY(8px); animation: inUp calc(0.75s * var(--k)) var(--ease) calc(1.18s * var(--k)) forwards; }
+.intro.out .in-word, .intro.out .in-tag { opacity: 0; transform: translateY(-14px) scale(0.98); }
+@keyframes inStars { to { opacity: 0.9; } }
+@keyframes inDrift { from { transform: scale(1.08); } to { transform: scale(1); } }
+@keyframes inGlow { from { opacity: 0; transform: scale(0.2); } to { opacity: 1; transform: scale(1); } }
+@keyframes inBreath { from { transform: scale(1); } to { transform: scale(1.09); } }
+@keyframes inSun { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+@keyframes inOrbit { to { stroke-dashoffset: 0; } }
+@keyframes inFade { to { opacity: 1; } }
+@keyframes inTrack { from { letter-spacing: 0.8em; padding-left: 0.8em; } to { letter-spacing: 0.34em; padding-left: 0.34em; } }
+@keyframes inLetter { to { opacity: 1; filter: blur(0); transform: none; } }
+@keyframes inShine { from { background-position: 120% 0; } to { background-position: -20% 0; } }
+@keyframes inUp { to { opacity: 1; transform: none; } }
+@keyframes inFlash { 0% { opacity: 0; transform: scale(0.15); } 28% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25); } }
+/* 인트로가 도는 동안 화면 장치(UI)는 숨겼다가, 우주로 들어가면서 차례로 나타난다 */
+body.intro-on :is(.topbar, .board, .board-pill, .view-ctl, .cmd, .nowbar, .labels, .mtags, .focus-chip) { opacity: 0; }
+body.intro-fade :is(.topbar, .board, .board-pill, .view-ctl, .cmd, .nowbar, .labels, .mtags, .focus-chip) { transition: opacity 0.9s var(--ease); }
+body.intro-fade .topbar { transition-delay: 0.05s; }
+body.intro-fade :is(.board, .board-pill) { transition-delay: 0.2s; }
+body.intro-fade :is(.cmd, .nowbar) { transition-delay: 0.3s; }
+body.intro-fade :is(.labels, .mtags) { transition-delay: 0.55s; }
+@media (prefers-reduced-motion: reduce) { .intro *, .intro *::before { animation-delay: 0s !important; } }

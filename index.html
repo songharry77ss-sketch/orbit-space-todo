@@ -22,6 +22,27 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body data-view="today">
+<div id="intro" class="intro" aria-hidden="true">
+  <div class="in-stars"></div>
+  <div class="in-flash"></div>
+  <div class="in-core">
+    <svg class="in-mark" viewBox="0 0 200 200">
+      <defs>
+        <radialGradient id="inSun" cx="44%" cy="40%" r="62%"><stop offset="0" stop-color="#fff6e4"/><stop offset=".3" stop-color="#ffd39a"/><stop offset=".72" stop-color="#f4a259"/><stop offset="1" stop-color="#b8521a"/></radialGradient>
+        <radialGradient id="inGlow"><stop offset="0" stop-color="#ffb46e" stop-opacity=".6"/><stop offset=".45" stop-color="#f4a259" stop-opacity=".18"/><stop offset="1" stop-color="#f4a259" stop-opacity="0"/></radialGradient>
+        <clipPath id="inBack" clipPathUnits="userSpaceOnUse"><rect x="-20" y="-20" width="240" height="120"/></clipPath>
+        <clipPath id="inFront" clipPathUnits="userSpaceOnUse"><rect x="-20" y="100" width="240" height="120"/></clipPath>
+      </defs>
+      <circle class="in-glow" cx="100" cy="100" r="96" fill="url(#inGlow)"/>
+      <g transform="rotate(-24 100 100)"><g clip-path="url(#inBack)"><ellipse class="in-orbit" cx="100" cy="100" rx="86" ry="36" pathLength="1"/><circle class="in-moon" r="5" cx="186" cy="100"/></g></g>
+      <circle class="in-sun" cx="100" cy="100" r="30" fill="url(#inSun)"/>
+      <g transform="rotate(-24 100 100)"><g clip-path="url(#inFront)"><ellipse class="in-orbit" cx="100" cy="100" rx="86" ry="36" pathLength="1"/><circle class="in-moon" r="5" cx="186" cy="100"/></g></g>
+    </svg>
+  </div>
+  <div class="in-word"><span style="--i:0">O</span><span style="--i:1">R</span><span style="--i:2">B</span><span style="--i:3">I</span><span style="--i:4">T</span></div>
+  <div class="in-tag"><span>할 일은 행성처럼, 집중은 태양처럼</span></div>
+</div>
+<script>(function () { var el = document.getElementById("intro"); window.ORBIT_INTRO_T = performance.now(); try { if (navigator.webdriver || /[?&]nointro/.test(location.search)) { el.remove(); return; } if (localStorage.getItem("orbit.intro")) el.classList.add("quick"); } catch (e) {} document.body.classList.add("intro-on"); var ms = el.querySelectorAll(".in-moon"), a0 = performance.now(); (function step(t) { if (!el.isConnected) return; var a = (t - a0) / 3400 * 6.2832, x = (100 + 86 * Math.cos(a)).toFixed(2), y = (100 + 36 * Math.sin(a)).toFixed(2); for (var i = 0; i < ms.length; i++) { ms[i].setAttribute("cx", x); ms[i].setAttribute("cy", y); } requestAnimationFrame(step); })(a0); setTimeout(function () { if (typeof Intro === "undefined" || !Intro.done) { el.classList.add("out"); document.body.classList.remove("intro-on"); setTimeout(function () { el.remove(); }, 1200); } }, 6000); })();</script>
 
 <main id="stage" aria-label="우주 할 일 지도">
   <canvas id="gl" aria-hidden="true"></canvas>
@@ -138,6 +159,7 @@
 <script src="js/board.js"></script>
 <script src="js/now.js"></script>
 <script src="js/listview.js"></script>
+<script src="js/intro.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

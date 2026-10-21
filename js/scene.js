@@ -253,8 +253,11 @@ const Scene = {
     }
     if (!fs && this.fRef) this.fRef.faz = null;
     D *= v.zoom; this.fe = fe;
-    const az = cam.az0 + v.az + azF + Math.sin(t * 0.06) * 0.03 * fl + px * 0.09 * (1 - fe * 0.6);
-    const el = U.clamp(elB + v.el + Math.sin(t * 0.045 + 1) * 0.012 * fl - py * 0.05, 0.06, 1.45);
+    /* 인트로 직후: 멀리서 돌며 날아 들어온다 */
+    let flyA = 0, flyE = 0;
+    if (this.fly) { const f = this.fly, p = Math.min(1, (performance.now() - f.t0) / f.ms), q = 1 - Math.pow(1 - p, 3); D *= U.lerp(f.z, 1, q); flyA = f.a * (1 - q); flyE = f.e * (1 - q); if (p >= 1) this.fly = null; }
+    const az = cam.az0 + v.az + azF + flyA + Math.sin(t * 0.06) * 0.03 * fl + px * 0.09 * (1 - fe * 0.6);
+    const el = U.clamp(elB + v.el + flyE + Math.sin(t * 0.045 + 1) * 0.012 * fl - py * 0.05, 0.06, 1.45);
     cam.azNow = az; cam.elNow = el;
     const mt = this.matrices(D, el, az, sx, sy, tg);
     cam.eye = mt.eye; cam.V = mt.V; cam.P = mt.P; cam.VP = mt.VP; cam.inv = null; cam.focal = this.H / 2 / Math.tan(cam.fov / 2);
@@ -501,6 +504,7 @@ const Scene = {
   },
   areaCenter() { const a = this.area; return [(a.left + a.right) / this.W - 1, 1 - (a.top + a.bottom) / this.H]; },
   resetView() { const v = this.v3d, TAU = Math.PI * 2; v.taz = Math.round(v.az / TAU) * TAU; v.tel = 0; v.tzoom = 1; this.focusOn(null); },
+  flyIn(ms = 2600) { if (!this.reduced) this.fly = { t0: performance.now(), ms, z: 3.2, a: -1.15, e: 0.34 }; },
   zoomBy(f) { this.v3d.tzoom = U.clamp(this.v3d.tzoom * f, 0.45, 1.8); },
   rotateBy(da, de) { this.v3d.taz += da; this.v3d.tel = U.clamp(this.v3d.tel + de, -0.38, 0.75); },
   setAutoRotate(on) { this.autoRotate = on; Store.setSetting("autoRotate", on); App.paintSpin(); },

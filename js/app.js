@@ -23,7 +23,7 @@ const App = {
     $("#focusChip").addEventListener("click", e => { if (e.target.closest("[data-act=back]")) Scene.focusOn(null); });
     $("#coach").addEventListener("click", e => { if (e.target.closest("[data-act]")) this.coach(false); });
     this.paintSpin();
-    if (!Store.state.settings.coachSeen) setTimeout(() => { if (!Store.state.settings.coachSeen && $("#coach").hidden) this.coach(true); }, 1600);
+    if (!Store.state.settings.coachSeen) Intro.after(() => setTimeout(() => { if (!Store.state.settings.coachSeen && $("#coach").hidden) this.coach(true); }, 1400));
     document.addEventListener("keydown", e => this.onKey(e));
     Store.on(d => this.onChange(d));
     const hash = location.hash.replace("#", "");
@@ -35,6 +35,7 @@ const App = {
     this.away(); setInterval(() => this.away(), 60000);
     window.addEventListener("resize", () => this.placeSeg());
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.placeSeg());
+    Intro.run();
 
   },
   onChange(d) {
