@@ -51,8 +51,9 @@ async function feature(browser, file) {
 (async () => {
   const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--lang=ko-KR", "--window-size=1400,1000"] });
   try {
-    await shoot(browser, path.join(__dirname, "play"), 360, 640, 3);
-    await feature(browser, path.join(__dirname, "play", "feature-1024x500.png"));
-    await shoot(browser, path.join(__dirname, "appstore"), 430, 932, 3);
+    const only = process.env.ORBIT_ONLY;
+    if (!only || only === "play") { await shoot(browser, path.join(__dirname, "play"), 360, 640, 3); await feature(browser, path.join(__dirname, "play", "feature-1024x500.png")); }
+    if (!only || only === "appstore") await shoot(browser, path.join(__dirname, "appstore"), 430, 932, 3);       // 1290×2796 (6.7·6.9인치)
+    if (!only || only === "appstore-63") await shoot(browser, path.join(__dirname, "appstore-63"), 402, 874, 3); // 1206×2622 (6.3인치 · 중형)
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
