@@ -11,18 +11,44 @@
       "bundleIdentifier": "com.craving.orbit",
       "buildNumber": "1",
       "supportsTablet": false,
-      "config": { "usesNonExemptEncryption": false },
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "WKAppBoundDomains": ["orbit-space-todo.vercel.app"],
+        "WKAppBoundDomains": [
+          "orbit-space-todo.vercel.app"
+        ],
         "CFBundleDevelopmentRegion": "ko",
         "CFBundleAllowMixedLocalizations": true
       }
     },
     "plugins": [
-      ["@react-native-google-signin/google-signin", { "iosUrlScheme": "com.googleusercontent.apps.57190288153-kk82o0on3ma0nbgce3s0ck8jacliquov" }],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.57190288153-kk82o0on3ma0nbgce3s0ck8jacliquov"
+        }
+      ],
       "expo-status-bar",
-      ["expo-splash-screen", { "backgroundColor": "#05060a", "image": "./assets/splash-icon.png", "imageWidth": 180, "dark": { "backgroundColor": "#05060a", "image": "./assets/splash-icon.png" } }]
-    ]
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#05060a",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "dark": {
+            "backgroundColor": "#05060a",
+            "image": "./assets/splash-icon.png"
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "08a94274-e1af-4bdb-9293-f3a25fd2e94c"
+      }
+    },
+    "owner": "harry832"
   }
 }

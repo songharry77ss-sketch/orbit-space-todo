@@ -1,6 +1,7 @@
 {
   "name": "ORBIT 우주 할 일",
   "short_name": "ORBIT",
+  "id": "./index.html",
   "description": "실제 행성 사진으로 만든 우주에서, 할 일을 태양에 올려 불태우는 투두리스트",
   "lang": "ko",
   "start_url": "./index.html",
@@ -9,15 +10,107 @@
   "orientation": "any",
   "background_color": "#04050b",
   "theme_color": "#04050b",
-  "categories": ["productivity", "utilities"],
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
   "icons": [
-    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    { "name": "오늘 할 일", "url": "./index.html#today", "description": "실제 행성 사진으로 만든 우주에서, 할 일을 태양에 올려 불태우는 투두리스트" },
-    { "name": "캘린더", "url": "./index.html#calendar", "description": "실제 행성 사진으로 만든 우주에서, 할 일을 태양에 올려 불태우는 투두리스트" }
-  ]
+    {
+      "name": "오늘 할 일",
+      "url": "./index.html#today",
+      "description": "실제 행성 사진으로 만든 우주에서, 할 일을 태양에 올려 불태우는 투두리스트"
+    },
+    {
+      "name": "캘린더",
+      "url": "./index.html#calendar",
+      "description": "실제 행성 사진으로 만든 우주에서, 할 일을 태양에 올려 불태우는 투두리스트"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "store/desktop/1-today.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "오늘 할 일 — 행성과 위성으로 보는 하루"
+    },
+    {
+      "src": "store/desktop/2-list.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "목록 — 행성별로 정리한 할 일"
+    },
+    {
+      "src": "store/desktop/3-week.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "주간 캘린더"
+    },
+    {
+      "src": "store/desktop/4-detail.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "할 일 상세 · 단계"
+    },
+    {
+      "src": "store/play/1-today.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "오늘 할 일 — 행성과 위성으로 보는 하루"
+    },
+    {
+      "src": "store/play/2-list.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "목록 — 행성별로 정리한 할 일"
+    },
+    {
+      "src": "store/play/3-week.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "주간 캘린더"
+    },
+    {
+      "src": "store/play/4-detail.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "할 일 상세 · 단계"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
 }
