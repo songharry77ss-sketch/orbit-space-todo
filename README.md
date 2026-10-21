@@ -95,16 +95,16 @@ Google 로그인을 쓰려면 Google Cloud에서 무료 OAuth 클라이언트 ID
 
 휴대폰에서는 상단 바가 두 줄로 바뀌고, 왼쪽 위 「오늘 할 일」 버튼으로 목록을 열며, 상세 화면은 아래에서 올라오는 시트(손잡이를 끌어내려 닫기)가 되며, 「지금 집중 중」 바는 입력창 바로 위에 붙고, 목록 보기는 열을 옆으로 넘겨 봅니다. 화면이 느려지면 렌더링 해상도를 자동으로 낮춰 부드럽게 유지합니다.
 
-App Store · Play Store 에 올리려면 이 폴더를 네이티브 껍데기로 감싸면 됩니다.
+스토어 앱은 모두 같은 웹앱(배포 주소)을 감싼 껍데기라, 웹을 배포하면 앱 내용도 함께 바뀝니다.
 
-```bash
-npm init -y && npm i @capacitor/core @capacitor/cli
-npx cap init "ORBIT" "com.example.orbit" --web-dir .
-npx cap add ios      # Mac + Xcode 필요
-npx cap add android  # Android Studio 필요
-```
+| 스토어 | 방식 | 위치 |
+| --- | --- | --- |
+| Google Play (Android) | TWA · Bubblewrap, 패키지 com.craving.orbit | android/tools/twa.js, .well-known/assetlinks.json |
+| App Store (iPhone · Apple Silicon Mac) | Expo WebView + 네이티브 Google 로그인, EAS 클라우드 빌드 | ios-app/ (원본 C:/Users/opqrt/orbit-ios) |
+| Microsoft Store (Windows) | PWABuilder 로 만든 MSIX (Partner Center 앱 ID 필요) | manifest.webmanifest |
 
-Android 는 [PWABuilder](https://www.pwabuilder.com) 에 배포 주소를 넣어 Play Store 용 패키지를 만들 수도 있습니다.
+Mac 은 App Store 의 iPhone 앱을 Apple Silicon Mac 에서도 받을 수 있게 켜 두었고(가격 및 사용 가능 여부), Intel Mac 은 Chrome · Edge · Safari 설치로 씁니다.
+스토어 이미지는 `node store/shoot.js` 로 다시 찍습니다. 한 폴더만 찍으려면 `ORBIT_ONLY` 에 play, appstore, appstore-63, desktop 중 하나를 넣습니다.
 
 ## 실행
 
