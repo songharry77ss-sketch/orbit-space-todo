@@ -54,58 +54,58 @@
   ],
   "screenshots": [
     {
-      "src": "store/desktop/1-today.png",
+      "src": "screenshots/wide-1-today.jpg",
       "sizes": "1920x1080",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "wide",
       "label": "오늘 할 일 — 행성과 위성으로 보는 하루"
     },
     {
-      "src": "store/desktop/2-list.png",
+      "src": "screenshots/wide-2-list.jpg",
       "sizes": "1920x1080",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "wide",
       "label": "목록 — 행성별로 정리한 할 일"
     },
     {
-      "src": "store/desktop/3-week.png",
+      "src": "screenshots/wide-3-week.jpg",
       "sizes": "1920x1080",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "wide",
       "label": "주간 캘린더"
     },
     {
-      "src": "store/desktop/4-detail.png",
+      "src": "screenshots/wide-4-detail.jpg",
       "sizes": "1920x1080",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "wide",
       "label": "할 일 상세 · 단계"
     },
     {
-      "src": "store/play/1-today.png",
+      "src": "screenshots/narrow-1-today.jpg",
       "sizes": "1080x1920",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "오늘 할 일 — 행성과 위성으로 보는 하루"
     },
     {
-      "src": "store/play/2-list.png",
+      "src": "screenshots/narrow-2-list.jpg",
       "sizes": "1080x1920",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "목록 — 행성별로 정리한 할 일"
     },
     {
-      "src": "store/play/3-week.png",
+      "src": "screenshots/narrow-3-week.jpg",
       "sizes": "1080x1920",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "주간 캘린더"
     },
     {
-      "src": "store/play/4-detail.png",
+      "src": "screenshots/narrow-4-detail.jpg",
       "sizes": "1080x1920",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "할 일 상세 · 단계"
     }
