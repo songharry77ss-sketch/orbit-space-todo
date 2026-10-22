@@ -101,7 +101,7 @@ Google 로그인을 쓰려면 Google Cloud에서 무료 OAuth 클라이언트 ID
 | --- | --- | --- |
 | Google Play (Android) | TWA · Bubblewrap, 패키지 com.craving.orbit | android/tools/twa.js, .well-known/assetlinks.json |
 | App Store (iPhone · Apple Silicon Mac) | Expo WebView + 네이티브 Google 로그인, EAS 클라우드 빌드 | ios-app/ (원본 C:/Users/opqrt/orbit-ios) |
-| Microsoft Store (Windows) | PWABuilder 로 만든 MSIX (Partner Center 앱 ID 필요) | manifest.webmanifest |
+| Microsoft Store (Windows) | PWABuilder 로 만든 MSIX, 패키지 CRAVING.ORBIT · Store ID 9MVXK376MQSS | manifest.webmanifest, store/windows-art (로고) |
 
 Mac 은 App Store 의 iPhone 앱을 Apple Silicon Mac 에서도 받을 수 있게 켜 두었고(가격 및 사용 가능 여부), Intel Mac 은 Chrome · Edge · Safari 설치로 씁니다.
 스토어 이미지는 `node store/shoot.js` 로 다시 찍습니다. 한 폴더만 찍으려면 `ORBIT_ONLY` 에 play, appstore, appstore-63, desktop 중 하나를 넣습니다.
