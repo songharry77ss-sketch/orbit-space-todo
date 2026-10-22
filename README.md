@@ -93,7 +93,7 @@ Google 로그인을 쓰려면 Google Cloud에서 무료 OAuth 클라이언트 ID
 | Mac (Chrome · Edge) | 배포 주소를 열고 주소창 오른쪽 **설치** 아이콘 → 데스크톱 앱처럼 실행 (Apple Silicon Mac 은 App Store 승인 후 App Store 에서도) |
 | Mac (Safari 17+) | 파일 메뉴 → **Dock에 추가** |
 | 갤럭시 · Android | Chrome 또는 삼성 인터넷 메뉴 → **홈 화면에 추가** / **앱 설치** |
-| iPhone · iPad | Safari 공유 버튼 → **홈 화면에 추가** |
+| iPhone · Apple Silicon Mac | [App Store](https://apps.apple.com/kr/app/id6825160850) 에서 설치, 또는 Safari 공유 버튼 → **홈 화면에 추가** |
 
 휴대폰에서는 상단 바가 두 줄로 바뀌고, 왼쪽 위 「오늘 할 일」 버튼으로 목록을 열며, 상세 화면은 아래에서 올라오는 시트(손잡이를 끌어내려 닫기)가 되며, 「지금 집중 중」 바는 입력창 바로 위에 붙고, 목록 보기는 열을 옆으로 넘겨 봅니다. 화면이 느려지면 렌더링 해상도를 자동으로 낮춰 부드럽게 유지합니다.
 
