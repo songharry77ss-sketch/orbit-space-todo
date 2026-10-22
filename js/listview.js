@@ -9,6 +9,15 @@ const ListView = {
     this.el.addEventListener("click", e => this.onClick(e));
     this.el.addEventListener("input", e => { if (e.target.id === "lvSearch") { this.q = e.target.value.trim().toLowerCase(); this.renderCols(); } });
     this.el.addEventListener("keydown", e => this.onKey(e));
+    /* 행성으로 묶었을 때: 열 머리를 끌면(터치는 손잡이) 행성 순서가 바뀐다 */
+    sortable(this.el, { item: ".lv-col", handle: ".lv-ch", touchHandle: ".lv-grip", axis: "x", scroller: () => this.el.querySelector("#lvCols"), enabled: () => this.by === "planet", onDrop: (ids, id) => { Store.reorderPlanets(ids, id); } });
+    this.el.addEventListener("keydown", e => {
+      const g = e.target.closest(".lv-grip"); if (!g || !["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+      e.preventDefault(); e.stopPropagation(); const id = g.closest(".lv-col").dataset.id, ids = Store.planets().map(p => p.id), i = ids.indexOf(id), j = i + (e.key === "ArrowLeft" ? -1 : 1);
+      if (j < 0 || j >= ids.length) return;
+      ids.splice(j, 0, ids.splice(i, 1)[0]); Store.reorderPlanets(ids, id);
+      this.el.querySelector(`.lv-col[data-id="${id}"] .lv-grip`)?.focus();
+    }, true);
     this.el.addEventListener("dragstart", e => { const c = e.target.closest(".lv-card"); if (!c) return; this.dragId = c.dataset.id; c.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", c.dataset.id); });
     this.el.addEventListener("dragend", () => { this.dragId = null; this.el.querySelectorAll(".dragging, .drop").forEach(x => x.classList.remove("dragging", "drop")); });
     this.el.addEventListener("dragover", e => {
@@ -55,8 +64,8 @@ const ListView = {
       const items = list.filter(g.test).sort((a, b) => ((a.status === "done") - (b.status === "done")) || Store.sortTasks(a, b));
       if (g.nodrop && !items.length) return "";
       const n = items.filter(t => t.status !== "done").length;
-      return `<section class="lv-col" data-key="${g.key}" ${g.nodrop ? 'data-nodrop="1"' : ""} style="${g.color ? `--gc:${g.color}` : ""}">
-        <header class="lv-ch">${g.icon}<span class="nm">${U.esc(g.title)}</span>${g.hint ? `<span class="hint">${g.hint}</span>` : ""}<span class="n num">${n}</span>${g.nodrop ? "" : `<button type="button" class="lv-add" data-act="add" aria-label="${U.esc(g.title)}에 할 일 추가" title="여기에 추가">${ico("plus", 15)}</button>`}</header>
+      return `<section class="lv-col" data-key="${g.key}" data-id="${g.key}" ${g.nodrop ? 'data-nodrop="1"' : ""} style="${g.color ? `--gc:${g.color}` : ""}">
+        <header class="lv-ch">${this.by === "planet" ? `<button type="button" class="grip lv-grip" aria-label="「${U.esc(g.title)}」 열 순서 바꾸기 · 끌거나 좌우 화살표" title="끌어서 행성 순서 바꾸기">${ico("grip", 14)}</button>` : ""}${g.icon}<span class="nm">${U.esc(g.title)}</span>${g.hint ? `<span class="hint">${g.hint}</span>` : ""}<span class="n num">${n}</span>${g.nodrop ? "" : `<button type="button" class="lv-add" data-act="add" aria-label="${U.esc(g.title)}에 할 일 추가" title="여기에 추가">${ico("plus", 15)}</button>`}</header>
         ${this.addKey === g.key ? `<div class="lv-addrow"><input type="text" id="lvAdd" placeholder="새 할 일 입력 후 Enter" aria-label="새 할 일" enterkeyhint="send"></div>` : ""}
         <div class="lv-cards">${items.map(t => this.card(t)).join("") || `<div class="lv-empty">${g.nodrop ? "" : "비어 있어요"}</div>`}</div>
       </section>`;

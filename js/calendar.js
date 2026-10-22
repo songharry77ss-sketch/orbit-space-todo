@@ -69,10 +69,10 @@ const Calendar = {
       const ds = U.dateStr(d), list = (byDate.get(ds) || []).sort(Store.sortTasks), other = d.getMonth() !== m, dn = list.filter(t => t.status === "done").length;
       if (!other) { total += list.length; done += dn; }
       const cls = ["cal-cell", other && "other", ds === today && "today", ds === this.selected && "sel", d.getDay() === 0 && "sun", d.getDay() === 6 && "sat"].filter(Boolean).join(" ");
-      const evs = GCal.eventsOn(ds), all = [...evs, ...list], shown = all.slice(0, max);
+      const evs = GCal.eventsOn(ds, true), all = [...evs, ...list], shown = all.slice(0, max);
       html += `<div class="${cls}" data-date="${ds}" role="button" tabindex="-1" aria-label="${U.fmtDate(ds)} 할 일 ${list.length}개">
         <div class="cal-day"><span class="d">${d.getDate()}</span>${list.length ? `<span class="cnt ${dn === list.length ? "alldone" : ""}">${dn}/${list.length}</span>` : ""}</div>
-        ${shown.map(t => { if (t.cal !== undefined) return `<div class="cal-ev" data-ev="${U.esc(t.id)}" style="--c:${t.color}" title="${U.esc(t.cal)} · ${U.esc(t.title)}"><span class="t">${t.time ? U.fmtTime(t.time) + " " : ""}${U.esc(t.title)}</span></div>`; const p = Store.planet(t.planetId); return `<div class="cal-task ${t.status} ${t.priority === 1 ? "p1" : ""}" draggable="true" data-id="${t.id}" style="--c:${p ? pColor(p) : "#fff"}" title="${U.esc(t.title)}">${t.priority === 1 ? prioSvg(1, 10) : ""}<span class="t">${U.esc(t.title)}</span></div>`; }).join("")}
+        ${shown.map(t => { if (t.cal !== undefined) return `<div class="cal-ev${t.busy ? " busy" : ""}" data-ev="${U.esc(t.id)}" style="--c:${t.color}" title="${U.esc(t.cal)} · ${U.esc(t.title)}"><span class="t">${t.time ? U.fmtTime(t.time) + " " : ""}${U.esc(t.title)}</span></div>`; const p = Store.planet(t.planetId); return `<div class="cal-task ${t.status} ${t.priority === 1 ? "p1" : ""}" draggable="true" data-id="${t.id}" style="--c:${p ? pColor(p) : "#fff"}" title="${U.esc(t.title)}">${t.priority === 1 ? prioSvg(1, 10) : ""}<span class="t">${U.esc(t.title)}</span></div>`; }).join("")}
         ${all.length > max ? `<div class="cal-more">+${all.length - max}</div>` : ""}
       </div>`;
     }
@@ -97,7 +97,7 @@ const Calendar = {
       const cls = ["wk-col", ds === today && "today", ds < today && "past", ds === this.selected && "sel", d.getDay() === 0 && "sun", d.getDay() === 6 && "sat"].filter(Boolean).join(" ");
       return `<section class="${cls}" data-date="${ds}">
         <button type="button" class="wk-head" data-act="day" aria-label="${U.fmtDate(ds)} 하루 보기"><span class="wd">${WEEKDAYS[d.getDay()]}</span><span class="d">${d.getDate()}</span>${ds === today ? `<span class="tdy">오늘</span>` : ""}${list.length ? `<span class="cnt ${dn === list.length ? "alldone" : ""}">${dn}/${list.length}</span>` : ""}</button>
-        <div class="wk-list">${GCal.eventsOn(ds).map(ev => `<div class="wk-ev" data-ev="${U.esc(ev.id)}" style="--c:${ev.color}" title="${U.esc(ev.cal)} · 누르면 구글 캘린더에서 열려요"><span class="tm">${ev.time ? U.fmtTime(ev.time) : "종일"}</span><span class="t">${U.esc(ev.title)}</span></div>`).join("")}${list.map(t => this.card(t)).join("")}${this.addDate === ds
+        <div class="wk-list">${GCal.eventsOn(ds).map(ev => `<div class="wk-ev${ev.busy ? " busy" : ""}" data-ev="${U.esc(ev.id)}" style="--c:${ev.color}" title="${U.esc(ev.cal)} · 누르면 구글 캘린더에서 열려요"><span class="tm">${ev.time ? U.fmtTime(ev.time) : "종일"}</span><span class="t">${U.esc(ev.title)}</span></div>`).join("")}${list.map(t => this.card(t)).join("")}${this.addDate === ds
           ? `<div class="wk-addrow"><input id="calAdd" type="text" placeholder="새 할 일 · Enter" enterkeyhint="send" autocomplete="off" aria-label="${U.fmtDate(ds)}에 할 일 추가"></div>`
           : `<button type="button" class="wk-add" data-act="add" aria-label="${U.fmtDate(ds)}에 할 일 추가">${ico("plus", 14)}<span>추가</span></button>`}</div>
       </section>`;

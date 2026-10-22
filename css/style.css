@@ -434,6 +434,24 @@ body.sheet-open:not(.narrow) .calendar { right: calc(var(--sheet-w) + 24px); }
 .pitem img { width: 34px; height: 34px; }
 .pitem .nm { flex: 1; min-width: 0; font-weight: 620; overflow: hidden; text-overflow: ellipsis; }
 .pitem .nm small { display: block; font-weight: 400; font-size: 12px; color: var(--ink-3); }
+/* 행성 순서 바꾸기: 손잡이 · 끄는 줄 */
+.grip { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 32px; margin: 0 -4px 0 -4px; border-radius: 6px; color: var(--ink-4); cursor: grab; touch-action: none; transition: color 0.12s, background 0.12s; }
+.grip:hover, .grip:focus-visible { color: var(--ink-2); background: var(--raise-2); }
+.pitem { position: relative; background: var(--panel-solid); }
+.pitem:first-child { border-radius: 9px 9px 0 0; } .pitem:last-child { border-radius: 0 0 9px 9px; } .pitem:only-child { border-radius: 9px; }
+@media (hover: hover) { .plist .pitem { cursor: grab; } .plist .pitem .btn { cursor: pointer; } }
+.plist.is-sorting .pitem { transition: transform 0.18s var(--ease); }
+.plist.is-sorting .pitem.sorting { transition: none; z-index: 2; cursor: grabbing; border-radius: 9px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--line-3); }
+.h4-sub { margin-left: 8px; font-size: 11.5px; font-weight: 400; color: var(--ink-4); letter-spacing: 0; }
+.lv-grip { width: 20px; height: 28px; margin: 0 -2px 0 -6px; }
+@media (hover: hover) { .lv-ch:has(.lv-grip) { cursor: grab; } .lv-ch:has(.lv-grip) button.lv-add { cursor: pointer; } }
+.is-sorting .lv-col { transition: transform 0.2s var(--ease); }
+.is-sorting .lv-col.sorting { transition: none; z-index: 3; cursor: grabbing; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--line-3); background: var(--panel-solid); }
+.is-sorting .lv-cols { scroll-snap-type: none; }
+.drag-ghost.is-planet img { width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--c), 0 0 24px color-mix(in srgb, var(--c) 55%, transparent); }
+.drag-ghost.is-planet img.is-saturn { border-radius: 0; box-shadow: none; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--c) 60%, transparent)); }
+.drag-ghost.is-planet .g-title, .drag-ghost.is-planet .g-slot { margin-top: -17px; }
+.g-slot { padding: 3px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--c) 26%, var(--panel-solid)); border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); white-space: nowrap; }
 .radio-row { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
 .radio-row + .radio-row { margin-top: 6px; }
 .radio-row select { width: auto; margin-left: auto; }
@@ -982,6 +1000,15 @@ body:has(.focus-chip:not([hidden])) .board-pill, body.sheet-open .board-pill { d
 .gc-key { display: flex; gap: 8px; margin-top: 10px; }
 .gc-key input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--raise); color: var(--ink); font: inherit; font-size: 12.5px; outline: 0; }
 .gc-key input:focus { border-color: var(--line-3); }
+.gc-more { display: block; margin: -4px 0 12px; font-size: 12.5px; }
+.gc-guide { margin: -2px 0 14px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--raise); font-size: 12.5px; line-height: 1.6; color: var(--ink-2); }
+.gc-guide > b { display: block; font-size: 13px; font-weight: 650; color: var(--ink); }
+.gc-guide p { margin: 4px 0 8px; color: var(--ink-3); }
+.gc-guide ol { margin: 0 0 12px; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.gc-guide ol b { color: var(--ink); font-weight: 600; }
+/* 일정 있는 시간대(제목 없음): 빗금으로 구분 */
+.cal-ev.busy, .wk-ev.busy { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 16%, transparent) 0 4px, transparent 4px 8px); }
+.wk-ev.busy .t, .b-evr.busy .t, .cal-ev.busy .t { color: var(--ink-3); }
 /* 캘린더 · 보드 속 구글 일정(읽기 전용): 테두리만 있는 칩으로 할 일과 구분 */
 .cal-ev { display: flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 4px; font-size: 11px; white-space: nowrap; overflow: hidden; color: var(--ink-2); border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 10%, transparent); cursor: pointer; flex-shrink: 0; }
 .cal-ev .t { overflow: hidden; text-overflow: ellipsis; }

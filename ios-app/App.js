@@ -15,6 +15,9 @@ const HOST = "orbit-space-todo.vercel.app";
 const IOS_CLIENT_ID = "57190288153-kk82o0on3ma0nbgce3s0ck8jacliquov.apps.googleusercontent.com";
 const BASE = ["https://www.googleapis.com/auth/calendar.app.created", "https://www.googleapis.com/auth/calendar.calendarlist.readonly"];
 const READ = "https://www.googleapis.com/auth/calendar.events.readonly";
+/* 웹앱이 고를 수 있는 추가 권한: 일정 있는 시간대만(민감하지 않음 · 경고 없음) / 일정 제목까지 */
+const FREE = "https://www.googleapis.com/auth/calendar.events.freebusy";
+const EXTRA = [FREE, READ];
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 GoogleSignin.configure({ iosClientId: IOS_CLIENT_ID, scopes: BASE });
@@ -65,7 +68,12 @@ export default function App() {
     try {
       if (m.type === "gcal-auth") {
         if (m.read) {
-          const r = GoogleSignin.getCurrentUser() ? await GoogleSignin.addScopes({ scopes: [READ] }) : await GoogleSignin.signIn();
+          const want = (Array.isArray(m.scopes) ? m.scopes : [READ]).filter(s => EXTRA.includes(s));
+          if (!GoogleSignin.getCurrentUser()) {
+            const r0 = await GoogleSignin.signIn();
+            if (!isSuccessResponse(r0)) { send({ type: "cancel" }); return; }
+          }
+          const r = await GoogleSignin.addScopes({ scopes: want.length ? want : [READ] });
           if (!r || !isSuccessResponse(r)) { send({ type: "cancel" }); return; }
         } else if (m.silent) {
           if (!GoogleSignin.hasPreviousSignIn()) { send({ type: "none" }); return; }
@@ -112,7 +120,7 @@ export default function App() {
         setSupportMultipleWindows={false}
         onOpenWindow={e => Linking.openURL(e.nativeEvent.targetUrl).catch(() => {})}
         limitsNavigationsToAppBoundDomains
-        injectedJavaScriptBeforeContentLoaded={"window.ORBIT_NATIVE = 'ios'; true;"}
+        injectedJavaScriptBeforeContentLoaded={"window.ORBIT_NATIVE = 'ios'; window.ORBIT_NATIVE_V = 2; true;"}
         allowsBackForwardNavigationGestures={false}
         bounces={false}
         overScrollMode="never"

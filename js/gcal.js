@@ -11,12 +11,15 @@ const GCAL_CLIENT_ID = "57190288153-op2qmf54d449vmqoge7roc4r1hik4ooo.apps.google
 const GCal = {
   /* 기본 연결은 Google이 「민감하지 않음」으로 분류한 두 권한만 쓴다 → 심사 · 경고 없이 누구나 연결 */
   SCOPES: ["https://www.googleapis.com/auth/calendar.app.created", "https://www.googleapis.com/auth/calendar.calendarlist.readonly"],
-  /* 내 다른 일정 함께 보기(선택): 사용자가 켤 때만 따로 요청하는 읽기 권한 */
+  /* 내 다른 일정 함께 보기(선택): 사용자가 켤 때만 따로 요청한다.
+     FREE(일정 있는 시간대만)는 민감하지 않은 범위라 경고 없이 바로 연결되고,
+     READ(일정 제목까지)는 민감한 범위라 Google 심사 전에는 「확인되지 않은 앱」 화면을 거친다 */
+  FREE: "https://www.googleapis.com/auth/calendar.events.freebusy",
   READ: "https://www.googleapis.com/auth/calendar.events.readonly",
   API: "https://www.googleapis.com/calendar/v3",
   token: null, exp: 0, scope: "", tc: null, busy: false, again: false, timer: null, err: "", listed: false,
   ext: [], extCals: [], extRange: null,
-  st() { const s = Store.state.settings; if (!s.gcal || typeof s.gcal !== "object") s.gcal = { on: false, calId: null, email: "", map: {}, syncToken: null, last: 0, show: false }; if (!s.gcal.map) s.gcal.map = {}; return s.gcal; },
+  st() { const s = Store.state.settings; if (!s.gcal || typeof s.gcal !== "object") s.gcal = { on: false, calId: null, email: "", map: {}, syncToken: null, last: 0, show: false }; if (!s.gcal.map) s.gcal.map = {}; if (s.gcal.show && !s.gcal.mode) s.gcal.mode = "read"; return s.gcal; },
   /* iOS 앱(App Store) 안에서는 구글 로그인을 앱이 대신하고 토큰만 넘겨준다(구글은 앱 내부 웹뷰 로그인을 막음) */
   native() { return window.ORBIT_NATIVE === "ios" && !!window.ReactNativeWebView; },
   post(m) { try { window.ReactNativeWebView.postMessage(JSON.stringify(m)); } catch (_) { /* 앱 밖 */ } },
@@ -24,6 +27,10 @@ const GCal = {
   on() { return !!(this.clientId() && this.st().on); },
   live() { return !!this.token && this.exp > Date.now() + 30000; },
   canRead() { return !!this.scope && this.scope.includes("calendar.events.readonly"); },
+  canFree() { return !!this.scope && /calendar\.(events\.)?freebusy/.test(this.scope); },
+  canShow() { return this.canRead() || this.canFree(); },
+  /* 예전 iOS 앱은 추가 권한을 고를 수 없어 늘 제목 읽기 권한을 요청한다 */
+  nativeScopes() { return this.native() && Number(window.ORBIT_NATIVE_V) >= 2; },
   state() { if (!this.clientId()) return "nokey"; if (!this.st().on) return "off"; if (!this.live()) return "expired"; if (this.busy) return "busy"; return this.err ? "error" : "ok"; },
   init() {
     try { const t = JSON.parse(sessionStorage.getItem("orbit-gtoken") || "null"); if (t && t.exp > Date.now() + 60000) { this.token = t.t; this.exp = t.exp; this.scope = t.s || ""; } } catch (_) { /* 저장소 없음 */ }
@@ -64,12 +71,23 @@ const GCal = {
     const st = this.st();
     this.client().requestAccessToken({ prompt: st.on ? "" : "consent", login_hint: st.email || undefined });
   },
-  /* 선택 기능: 내 구글 일정을 ORBIT에 함께 보기 위한 읽기 권한을 추가로 요청 */
-  enableRead() {
-    if (this.native()) { this._wantRead = true; this.post({ type: "gcal-auth", read: true }); return; }
+  /* 선택 기능: 내 구글 일정을 ORBIT에 함께 보기 위한 권한을 추가로 요청.
+     full = false 면 일정 있는 시간대만(경고 없음), true 면 일정 제목까지(심사 전엔 경고 화면) */
+  enableShow(full) {
+    const add = full ? this.READ : this.FREE;
+    if (this.native()) { this._wantRead = full || !this.nativeScopes() ? "full" : "free"; this.post({ type: "gcal-auth", read: true, scopes: [add] }); return; }
     if (!(window.google && google.accounts && google.accounts.oauth2)) { this.loadGis().then(() => App.toast("calendar", "준비됐어요. 한 번 더 눌러 주세요")).catch(e => App.toast("alert", e.message)); return; }
-    this._wantRead = true;
-    this.client().requestAccessToken({ scope: [...this.SCOPES, this.READ].join(" "), prompt: "consent", login_hint: this.st().email || undefined });
+    this._wantRead = full ? "full" : "free";
+    this.client().requestAccessToken({ scope: [...this.SCOPES, add].join(" "), prompt: "consent", login_hint: this.st().email || undefined });
+  },
+  gotShow() {
+    const want = this._wantRead, st = this.st(); this._wantRead = false;
+    if (this.canShow()) st.mode = this.canRead() ? "read" : "free";   /* 연결 시간이 지나도 어떤 보기였는지 기억 */
+    if (!want) return;
+    st.show = this.canShow();
+    if (want === "full" && !this.canRead()) App.toast("alert", st.show ? "제목 보기 권한이 체크되지 않아 일정 있는 시간만 보여 드려요" : "일정 보기 권한이 체크되지 않아 켜지 못했어요");
+    else if (!st.show) App.toast("alert", "일정 보기 권한이 체크되지 않아 켜지 못했어요");
+    this.titleHelp = false;
   },
   onToken(r) {
     if (!r || r.error || !r.access_token) { App.toast("alert", "Google 연결이 취소됐어요"); this.paint(); return; }
@@ -77,7 +95,7 @@ const GCal = {
     this.token = r.access_token; this.exp = Date.now() + (Number(r.expires_in) || 3600) * 1000; this.scope = r.scope || this.SCOPES.join(" ");
     try { sessionStorage.setItem("orbit-gtoken", JSON.stringify({ t: this.token, exp: this.exp, s: this.scope })); } catch (_) { /* 저장소 없음 */ }
     const st = this.st(), first = !st.on; st.on = true; this.err = "";
-    if (this._wantRead) { this._wantRead = false; st.show = this.canRead(); if (!st.show) App.toast("alert", "일정 보기 권한이 체크되지 않아 켜지 못했어요"); }
+    this.gotShow();
     Store.save();
     this.sync(true).then(ok => { if (ok && first) App.toast("calendar", `Google 캘린더에 연결했어요 · 「ORBIT 할 일」에 ${Object.keys(st.map).length}개를 넣었어요`); });
   },
@@ -89,7 +107,7 @@ const GCal = {
       this.token = m.access_token; this.exp = Date.now() + (Number(m.expires_in) || 3300) * 1000; this.scope = m.scope;
       try { sessionStorage.setItem("orbit-gtoken", JSON.stringify({ t: this.token, exp: this.exp, s: this.scope })); } catch (_) { /* 저장소 없음 */ }
       const st = this.st(), first = !st.on; st.on = true; this.err = ""; if (m.email) st.email = m.email;
-      if (this._wantRead) { this._wantRead = false; st.show = this.canRead(); if (!st.show) App.toast("alert", "일정 보기 권한이 체크되지 않아 켜지 못했어요"); }
+      this.gotShow();
       Store.save();
       this.sync(true).then(ok => { if (ok && first) App.toast("calendar", `Google 캘린더에 연결했어요 · 「ORBIT 할 일」에 ${Object.keys(st.map).length}개를 넣었어요`); });
     } else if (m.type === "cancel") { this._wantRead = false; App.toast("alert", "Google 연결이 취소됐어요"); this.paint(); }
@@ -220,7 +238,7 @@ const GCal = {
     try {
       if (!st.calId || !this.listed || force) await this.ensureCal();
       const r = await this.pull(); await this.push();
-      if (st.show && this.canRead()) await this.fetchExt();
+      if (st.show && this.canShow()) await this.fetchExt();
       st.last = Date.now(); this.err = ""; ok = true;
       const msg = [r.added && `새 일정 ${r.added}개`, r.changed && `바뀐 일정 ${r.changed}개`, r.removed && `지운 일정 ${r.removed}개는 기한 없음으로`].filter(Boolean);
       if (msg.length) App.toast("calendar", `구글 캘린더 변경을 반영했어요 · ${msg.join(" · ")}`);
@@ -238,7 +256,32 @@ const GCal = {
   /* ── 구글 일정(읽기 전용) ── */
   async fetchExt(from, to) {
     from = from || U.addDays(U.today(), -42); to = to || U.addDays(U.today(), 84);
-    const tmin = new Date(`${from}T00:00:00`).toISOString(), tmax = new Date(`${to}T23:59:59`).toISOString(), out = [];
+    const tmin = new Date(`${from}T00:00:00`).toISOString(), tmax = new Date(`${to}T23:59:59`).toISOString();
+    const out = this.canRead() ? await this.fetchEvents(tmin, tmax) : await this.fetchBusy(from, to);
+    this.ext = out; this.extRange = [from, to];
+    try { localStorage.setItem("orbit-gcal-ext", JSON.stringify({ items: out, cals: this.extCals })); } catch (_) { /* 저장소 없음 */ }
+  },
+  /* 일정 있는 시간대만: 제목 없이 캘린더별 '바쁜 시간'을 받아 칸으로 보여 준다. 한 번에 30일씩 묻는다 */
+  async fetchBusy(from, to) {
+    const out = [], seen = new Set(), cals = this.extCals.slice(0, 50), p = n => String(n).padStart(2, "0"), hm = d => `${p(d.getHours())}:${p(d.getMinutes())}`;
+    if (!cals.length) return out;
+    for (let a = from; a <= to; a = U.addDays(a, 30)) {
+      const b = U.addDays(a, 29) < to ? U.addDays(a, 29) : to;
+      const r = await this.api("/freeBusy", { method: "POST", body: { timeMin: new Date(`${a}T00:00:00`).toISOString(), timeMax: new Date(`${b}T23:59:59`).toISOString(), timeZone: this.tz(), items: cals.map(c => ({ id: c.id })) } });
+      for (const c of cals) {
+        const x = r && r.calendars && r.calendars[c.id]; if (!x || (x.errors && x.errors.length)) continue;
+        for (const bz of x.busy || []) {
+          const s = new Date(bz.start), e = new Date(bz.end), id = `fb:${c.id}:${s.getTime()}`; if (!(e > s) || seen.has(id)) continue; seen.add(id);
+          const due = U.dateStr(s), last = U.dateStr(new Date(e.getTime() - 60000)), allDay = hm(s) === "00:00" && hm(e) === "00:00";
+          const until = last === due ? U.fmtTime(hm(e)) : `${e.getMonth() + 1}/${e.getDate()} ${U.fmtTime(hm(e))}`;
+          out.push({ id, busy: true, title: allDay ? "종일 일정 있음" : `일정 있음 ~${until}`, due, time: allDay ? null : hm(s), end: last > due ? last : due, color: c.color, cal: c.name, link: `https://calendar.google.com/calendar/r/day/${s.getFullYear()}/${s.getMonth() + 1}/${s.getDate()}` });
+        }
+      }
+    }
+    return out;
+  },
+  async fetchEvents(tmin, tmax) {
+    const out = [];
     for (const c of this.extCals) {
       try {
         const r = await this.api(`/calendars/${encodeURIComponent(c.id)}/events`, { query: { timeMin: tmin, timeMax: tmax, singleEvents: "true", orderBy: "startTime", maxResults: "250" } });
@@ -249,8 +292,7 @@ const GCal = {
         }
       } catch (e) { if (e.code === 401) throw e; }
     }
-    this.ext = out; this.extRange = [from, to];
-    try { localStorage.setItem("orbit-gcal-ext", JSON.stringify({ items: out, cals: this.extCals })); } catch (_) { /* 저장소 없음 */ }
+    return out;
   },
   /* 캘린더가 받아 둔 범위 밖을 보면 그 구간을 더 불러온다 */
   need(from, to) {
@@ -259,9 +301,13 @@ const GCal = {
     this._fetching = true;
     this.fetchExt(U.addDays(from, -7), U.addDays(to, 7)).catch(() => {}).finally(() => { this._fetching = false; Calendar.render(); });
   },
-  eventsOn(ds) {
+  /* merge = true(월간 칸): 제목 없는 「일정 있음」 칸이 여럿이면 한 칸으로 묶어 할 일을 가리지 않게 한다 */
+  eventsOn(ds, merge) {
     if (!this.on() || !this.st().show) return [];
-    return this.ext.filter(e => e.due <= ds && e.end >= ds).sort((a, b) => ((!a.time) - (!b.time)) || (a.time || "").localeCompare(b.time || ""));
+    const list = this.ext.filter(e => e.due <= ds && e.end >= ds).sort((a, b) => ((!a.time) - (!b.time)) || (a.time || "").localeCompare(b.time || ""));
+    const busy = list.filter(e => e.busy); if (!merge || busy.length < 2) return list;
+    const f = busy[0], times = busy.map(e => (e.time ? U.fmtTime(e.time) : "종일") + " " + e.title.replace("일정 있음 ", "")).join(", ");
+    return [...list.filter(e => !e.busy), { id: f.id, busy: true, title: `일정 ${busy.length}개`, time: f.time, end: ds, color: f.color, cal: times }];
   },
   openEvent(id) { const e = this.ext.find(x => x.id === id); if (e && e.link) window.open(e.link, "_blank", "noopener"); },
   /* ── 화면 ── */
@@ -306,16 +352,28 @@ const GCal = {
       box.querySelector("#gcConnect").addEventListener("click", () => this.connect());
       return;
     }
-    const n = Object.keys(st.map).length, stx = { ok: "동기화됨", busy: "동기화 중…", expired: "연결 시간이 지났어요", error: "문제가 있어요" }[s];
+    const live = this.live(), showOn = !!st.show && (this.canShow() || !live), titles = live ? this.canRead() : st.mode === "read", n = Object.keys(st.map).length, stx = { ok: "동기화됨", busy: "동기화 중…", expired: "연결 시간이 지났어요", error: "문제가 있어요" }[s];
     box.innerHTML = `<div class="gc-card on">${top("Google 캘린더 연결됨", `${U.esc(st.email || "")}${st.email ? " · " : ""}${stx}`, true)}
       ${this.err ? `<p class="gc-err">${U.esc(this.err)}</p>` : ""}
-      <label class="toggle-row cs-row"><span>내 구글 일정도 ORBIT에 함께 보기${this.canRead() ? "" : '<br><small style="color:var(--ink-3)">켜면 일정 읽기 권한을 한 번 더 물어봐요. Google 심사 전이라 「확인되지 않은 앱」 안내가 나오면 고급 → ORBIT(으)로 이동</small>'}</span><button type="button" class="switch ${st.show && this.canRead() ? "on" : ""}" id="gcShow" role="switch" aria-checked="${st.show && this.canRead()}" aria-label="구글 일정 함께 보기"></button></label>
+      <label class="toggle-row cs-row"><span>내 구글 일정도 ORBIT에 함께 보기<br><small style="color:var(--ink-3)">${showOn ? (titles ? "일정 제목까지 보여요" : "일정이 있는 시간대만 보여요 (제목은 숨김)") : this.canShow() ? "꺼져 있어요" : (this.native() && !this.nativeScopes() ? "켜면 일정 읽기 권한을 한 번 더 물어봐요" : "켜면 일정 있는 시간만 읽는 권한을 물어봐요 · 경고 화면 없이 바로 연결돼요")}</small></span><button type="button" class="switch ${showOn ? "on" : ""}" id="gcShow" role="switch" aria-checked="${showOn}" aria-label="구글 일정 함께 보기"></button></label>
+      ${this.titleHelp || (showOn && !titles) ? (this.titleHelp ? `<div class="gc-guide"><b>일정 제목까지 보려면</b>
+        <p>제목을 읽는 권한은 Google 앱 심사가 끝날 때까지 「Google에서 확인하지 않은 앱」 화면을 한 번 거쳐요. ORBIT 개발자가 직접 만든 앱이고, 일정은 이 기기에서 읽기만 할 뿐 어디에도 보내거나 바꾸지 않아요.</p>
+        <ol><li>경고 화면 왼쪽 아래 <b>고급</b>을 눌러요</li><li><b>…(으)로 이동(안전하지 않음)</b>을 눌러요</li><li><b>일정 보기</b> 권한을 체크하고 <b>계속</b></li></ol>
+        <div class="btn-row"><button type="button" class="btn sm" id="gcTitleNo">그만두기</button><button type="button" class="gc-connect sm" id="gcTitleGo">${G}계속해서 제목 보기</button></div></div>`
+        : `<button type="button" class="link-btn gc-more" id="gcTitles">일정 제목도 보고 싶어요</button>`) : ""}
       <div class="btn-row">${s === "expired" ? `<button type="button" class="gc-connect sm" id="gcConnect">${G}다시 연결</button>` : `<button type="button" class="btn sm" id="gcSync" ${s === "busy" ? "disabled" : ""}>${ico("repeat", 15)}지금 동기화</button>`}<a class="btn sm" href="https://calendar.google.com/" target="_blank" rel="noopener">구글 캘린더 열기</a><button type="button" class="btn sm danger" id="gcOff">연결 끊기</button></div>
       <p class="cs-note">「ORBIT 할 일」 캘린더 · 함께 바뀌는 할 일 ${n}개 · 마지막 동기화 ${this.ago(st.last)}. Google 보안 정책상 연결은 1시간마다 새로 받아야 해서, 끊기면 캘린더 위 「다시 연결」을 한 번 눌러 주세요. 그동안 바뀐 내용은 다시 연결할 때 함께 올라가요.</p></div>`;
     box.querySelector("#gcShow").addEventListener("click", () => {
-      if (!this.canRead()) { this.enableRead(); return; }
+      if (!this.canShow() && !(st.show && !live)) {
+        /* 예전 iOS 앱은 제목 읽기 권한(경고 화면)만 요청할 수 있어 안내부터 보여 준다 */
+        if (this.native() && !this.nativeScopes()) { this.titleHelp = true; this.renderSection(); } else this.enableShow(false);
+        return;
+      }
       st.show = !st.show; Store.save(); this.renderSection(); if (st.show) this.sync(); else { Calendar.render(); if (Board.el) Board.render(); }
     });
+    const tl = box.querySelector("#gcTitles"); if (tl) tl.addEventListener("click", () => { this.titleHelp = true; this.renderSection(); });
+    const tn = box.querySelector("#gcTitleNo"); if (tn) tn.addEventListener("click", () => { this.titleHelp = false; this.renderSection(); });
+    const tg = box.querySelector("#gcTitleGo"); if (tg) tg.addEventListener("click", () => this.enableShow(true));
     const c = box.querySelector("#gcConnect"); if (c) c.addEventListener("click", () => this.connect());
     const y = box.querySelector("#gcSync"); if (y) y.addEventListener("click", () => this.sync(true));
     box.querySelector("#gcOff").addEventListener("click", () => this.disconnect());

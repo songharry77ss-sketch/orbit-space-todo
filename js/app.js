@@ -82,8 +82,8 @@ const App = {
   coach(show) {
     const el = $("#coach"); if (!show) { el.hidden = true; Store.setSetting("coachSeen", true); return; }
     const touch = Scene.touch, rows = touch
-      ? [["한 손가락 드래그", "빈 공간을 끌면 시점이 돌아가요"], ["두 손가락", "오므리거나 벌려서 확대·축소해요"], ["행성 탭", "가까이 다가가 할 일을 보여 줘요"], ["위성 끌기", "태양에 놓으면 집중, 다른 행성에 놓으면 이동해요. 잘못 옮기면 알림에서 실행 취소"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 탭", "전체 보기로 돌아가요"]]
-      : [["드래그", "빈 공간을 끌면 시점이 돌아가요"], ["휠", "확대하고 축소해요"], ["행성 클릭", "가까이 다가가 할 일을 보여 줘요"], ["위성 끌기", "태양에 놓으면 집중, 다른 행성에 놓으면 이동해요. 잘못 옮기면 알림에서 실행 취소"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 클릭", "전체 보기로 돌아가요"]];
+      ? [["한 손가락 드래그", "빈 공간을 끌면 시점이 돌아가요"], ["두 손가락", "오므리거나 벌려서 확대·축소해요"], ["행성 탭", "가까이 다가가 할 일을 보여 줘요"], ["위성 끌기", "태양에 놓으면 집중, 다른 행성에 놓으면 이동해요. 잘못 옮기면 알림에서 실행 취소"], ["행성 끌기", "다른 궤도에 놓으면 행성 순서가 바뀌어요"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 탭", "전체 보기로 돌아가요"]]
+      : [["드래그", "빈 공간을 끌면 시점이 돌아가요"], ["휠", "확대하고 축소해요"], ["행성 클릭", "가까이 다가가 할 일을 보여 줘요"], ["위성 끌기", "태양에 놓으면 집중, 다른 행성에 놓으면 이동해요. 잘못 옮기면 알림에서 실행 취소"], ["행성 끌기", "다른 궤도에 놓으면 행성 순서가 바뀌어요"], ["이름표의 불꽃", "누르면 바로 집중을 시작해요"], ["두 번 클릭", "전체 보기로 돌아가요"]];
     el.innerHTML = `<div class="coach-h"><span>조작 안내</span><button type="button" class="icon-btn plain sm" data-act="close" aria-label="닫기">${ico("x", 16)}</button></div>
       <ul class="coach-list">${rows.map(([k, v]) => `<li><span class="ck">${k}</span><span>${v}</span></li>`).join("")}</ul>
       ${touch ? "" : `<div class="coach-keys"><kbd>N</kbd> 새 할 일 <kbd>/</kbd> 검색 <kbd>3</kbd> 목록 <kbd>0</kbd> 전체 보기 <kbd>R</kbd> 자동 회전</div>`}
@@ -328,8 +328,8 @@ const Modal = {
       : android ? "브라우저 메뉴(⋮)에서 「홈 화면에 추가」 또는 「앱 설치」를 누르세요."
       : "Chrome이나 Edge 주소창 오른쪽의 설치 아이콘으로 데스크톱 앱처럼 설치할 수 있어요. https 주소로 열었을 때 동작해요.";
     this.show(`<h3>설정</h3><p class="desc">행성은 할 일의 카테고리예요. 실제 천체 사진으로 나만의 태양계를 꾸며 보세요.</p>
-      <h4>행성</h4>
-      <div class="plist">${ps.map(p => `<div class="pitem">${thumbImg(bodyKey(p), 38)}<div class="nm">${U.esc(p.name)}<small>${bodyOf(p).ko} · 남은 할 일 ${Store.tasksOf(p.id).filter(t => t.status !== "done").length}개</small></div><button type="button" class="btn sm" data-edit="${p.id}">편집</button></div>`).join("")}</div>
+      <h4>행성<span class="h4-sub">${ps.length > 1 ? "끌어서 순서를 바꿔요 · 위가 태양에 가까운 궤도" : ""}</span></h4>
+      <div class="plist">${ps.map(p => `<div class="pitem" data-id="${p.id}">${ps.length > 1 ? `<button type="button" class="grip" aria-label="「${U.esc(p.name)}」 순서 바꾸기 · 끌거나 위아래 화살표" title="끌어서 순서 바꾸기">${ico("grip", 16)}</button>` : ""}${thumbImg(bodyKey(p), 38)}<div class="nm">${U.esc(p.name)}<small>${bodyOf(p).ko} · 남은 할 일 ${Store.tasksOf(p.id).filter(t => t.status !== "done").length}개</small></div><button type="button" class="btn sm" data-edit="${p.id}">편집</button></div>`).join("")}</div>
       <div class="btn-row" style="margin-top:10px"><button type="button" class="btn sm" id="mAdd">${ico("plus", 15)}행성 추가</button></div>
       <h4>화면</h4>
       <label class="toggle-row"><span>위성 옆에 할 일 이름 항상 표시<br><small style="color:var(--ink-3)">끄면 행성에 마우스를 올렸을 때만 보여요</small></span><button type="button" class="switch ${Scene.showNames ? "on" : ""}" id="mNames" role="switch" aria-checked="${Scene.showNames}" aria-label="위성 이름 항상 표시"></button></label>
@@ -349,6 +349,15 @@ const Modal = {
       <div class="m-actions"><button type="button" class="btn" id="mClose">닫기</button></div>`);
     const c = this.card, on = (s, f) => { const el = c.querySelector(s); if (el) el.addEventListener("click", f); };
     c.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => this.planet(b.dataset.edit)));
+    const pl = c.querySelector(".plist");
+    sortable(pl, { item: ".pitem", handle: ".pitem", touchHandle: ".grip", onDrop: (ids, id) => { Store.reorderPlanets(ids, id); } });
+    pl.addEventListener("keydown", e => {
+      const g = e.target.closest(".grip"); if (!g || !["ArrowUp", "ArrowDown"].includes(e.key)) return;
+      e.preventDefault(); const row = g.closest(".pitem"), ids = Store.planets().map(p => p.id), i = ids.indexOf(row.dataset.id), j = i + (e.key === "ArrowUp" ? -1 : 1);
+      if (j < 0 || j >= ids.length) return;
+      ids.splice(j, 0, ids.splice(i, 1)[0]); Store.reorderPlanets(ids, row.dataset.id);
+      const sib = e.key === "ArrowUp" ? row.previousElementSibling : row.nextElementSibling.nextElementSibling; pl.insertBefore(row, sib); g.focus();
+    });
     on("#mAdd", () => this.planet(null)); on("#mCal", () => CalSync.open()); on("#mClose", () => this.close());
     on("#mSpin", e => { const b = e.currentTarget, v = !Scene.autoRotate; Scene.setAutoRotate(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
     on("#mNotify", e => { const b = e.currentTarget, v = !Native.on(); Native.setOn(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });

@@ -118,3 +118,56 @@ U.nextWeekday = function (fromStr, wd, forceNextWeek) {
   d.setDate(d.getDate() + delta);
   return U.dateStr(d);
 };
+
+/* ── 끌어서 순서 바꾸기(설정의 행성 목록 · 목록 보기의 행성 열 공용) ──
+   잡는 즉시 따라오고(기다림 없음), 나머지 칸이 비켜 주며, 놓으면 onDrop(새 순서 ids, 옮긴 id).
+   스크롤되는 상자 가장자리로 끌면 그쪽으로 저절로 넘어간다 */
+function sortable(box, { item, handle, touchHandle, axis = "y", scroller, enabled, onDrop }) {
+  box.addEventListener("pointerdown", e => {
+    if ((e.pointerType === "mouse" && e.button !== 0) || (enabled && !enabled())) return;
+    /* 터치는 스크롤과 겹치지 않게 손잡이(touchHandle)로만 잡는다 */
+    const h = e.target.closest(e.pointerType !== "mouse" && touchHandle ? touchHandle : handle); if (!h || !box.contains(h)) return;
+    const ctl = e.target.closest("button, input, a, select, label"); if (ctl && ctl !== h && h.contains(ctl) && !ctl.classList.contains("grip")) return;
+    const el = h.closest(item), items = [...box.querySelectorAll(item)], from = items.indexOf(el);
+    if (from < 0 || items.length < 2) return;
+    e.preventDefault();
+    const X = axis === "x", sc = (typeof scroller === "function" ? scroller() : scroller) || box, pos = ev => X ? ev.clientX : ev.clientY, scr = () => X ? sc.scrollLeft : sc.scrollTop;
+    const r = items.map(n => n.getBoundingClientRect()), mid = r.map(q => X ? q.left + q.width / 2 : q.top + q.height / 2);
+    const step = items.length > 1 ? Math.abs(mid[1] - mid[0]) : 0, p0 = pos(e), s0 = scr();
+    let to = from, live = false, last = p0, raf = 0;
+    const place = () => {
+      const d = last - p0 + scr() - s0, c = mid[from] + d;
+      el.style.transform = X ? `translateX(${d}px)` : `translateY(${d}px)`;
+      to = items.filter((n, i) => i !== from && mid[i] < c).length;
+      items.forEach((n, i) => { if (n === el) return; const sh = from < to && i > from && i <= to ? -step : to < from && i >= to && i < from ? step : 0; n.style.transform = sh ? (X ? `translateX(${sh}px)` : `translateY(${sh}px)`) : ""; });
+    };
+    const edge = () => {
+      raf = 0; if (!live) return;
+      const b = sc.getBoundingClientRect(), lo = X ? b.left : b.top, hi = X ? b.right : b.bottom, v = last < lo + 48 ? -1 : last > hi - 48 ? 1 : 0;
+      if (!v) return;
+      const before = scr(); if (X) sc.scrollLeft += v * 12; else sc.scrollTop += v * 12;
+      if (scr() !== before) place();
+      raf = requestAnimationFrame(edge);
+    };
+    const mv = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      last = pos(ev);
+      if (!live) { if (Math.abs(last - p0) < 4) return; live = true; el.classList.add("sorting"); box.classList.add("is-sorting"); try { if (navigator.vibrate && ev.pointerType !== "mouse") navigator.vibrate(8); } catch (_) { /* 지원 안 함 */ } }
+      ev.preventDefault(); place(); if (!raf) raf = requestAnimationFrame(edge);
+    };
+    const up = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
+      cancelAnimationFrame(raf); raf = 0;
+      items.forEach(n => { n.style.transform = ""; }); el.classList.remove("sorting"); box.classList.remove("is-sorting");
+      if (!live) return;
+      /* 끌고 난 뒤 따라오는 클릭(열 머리 · 행성 열기)은 무시 */
+      const stop = ce => { ce.stopPropagation(); ce.preventDefault(); };
+      window.addEventListener("click", stop, true); setTimeout(() => window.removeEventListener("click", stop, true), 0);
+      if (ev.type === "pointercancel" || to === from) return;
+      const ids = items.map(n => n.dataset.id); ids.splice(to, 0, ids.splice(from, 1)[0]);
+      if (onDrop(ids, el.dataset.id) !== false) { const rest = items.filter(n => n !== el); el.parentNode.insertBefore(el, to < rest.length ? rest[to] : rest[rest.length - 1].nextSibling); }
+    };
+    window.addEventListener("pointermove", mv, { passive: false }); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
+  });
+}

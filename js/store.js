@@ -79,6 +79,23 @@ const Store = {
   },
   freeBody() { const used = new Set(this.state.planets.map(p => p.body)); return BODY_ORDER.find(k => !used.has(k)) || BODY_ORDER[this.state.planets.length % BODY_ORDER.length]; },
   updatePlanet(id, patch) { const p = this.planet(id); if (!p) return; Object.assign(p, patch); this.emit({ type: "planet-update", id }); },
+  /* 행성 순서(안쪽 궤도부터). ids 순서대로 order 를 다시 매긴다 */
+  setPlanetOrder(ids) {
+    const before = this.planets().map(p => p.id).join(",");
+    const rank = new Map(ids.map((id, i) => [id, i]));
+    this.planets().sort((a, b) => (rank.has(a.id) ? rank.get(a.id) : 1e9) - (rank.has(b.id) ? rank.get(b.id) : 1e9)).forEach((p, i) => { p.order = i; });
+    if (this.planets().map(p => p.id).join(",") === before) return false;
+    this.emit({ type: "planet-order" });
+    return true;
+  },
+  /* 순서를 바꾸고 알림에서 되돌릴 수 있게 한다 */
+  reorderPlanets(ids, movedId) {
+    const prev = this.planets().map(p => p.id);
+    if (!this.setPlanetOrder(ids)) return false;
+    const p = this.planet(movedId), i = this.planets().findIndex(x => x.id === movedId);
+    if (typeof App !== "undefined") App.toast("orbit", p ? `「${p.name}」 행성을 ${i + 1}번째 궤도로 옮겼어요` : "행성 순서를 바꿨어요", () => this.setPlanetOrder(prev));
+    return true;
+  },
   removePlanet(id, moveToId) {
     if (this.state.planets.length <= 1) return false;
     this.state.planets = this.state.planets.filter(p => p.id !== id);
