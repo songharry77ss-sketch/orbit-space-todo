@@ -8,7 +8,7 @@ const App = {
   init() {
     Store.load(); this.day = U.today();
     document.querySelectorAll("[data-ico]").forEach(el => { el.outerHTML = ico(el.dataset.ico, 18); });
-    Scene.init(); Panel.init(); Calendar.init(); QuickAdd.init(); Palette.init(); Board.init(); Now.init(); ListView.init(); GCal.init();
+    Scene.init(); Panel.init(); Calendar.init(); QuickAdd.init(); Palette.init(); Board.init(); Now.init(); ListView.init(); GCal.init(); Native.init();
     $("#gcalBtn").addEventListener("click", () => GCal.headClick());
     document.querySelectorAll(".seg-btn").forEach(b => b.addEventListener("click", () => this.setView(b.dataset.view)));
     $("#searchBtn").addEventListener("click", () => Palette.open());
@@ -334,6 +334,7 @@ const Modal = {
       <h4>화면</h4>
       <label class="toggle-row"><span>위성 옆에 할 일 이름 항상 표시<br><small style="color:var(--ink-3)">끄면 행성에 마우스를 올렸을 때만 보여요</small></span><button type="button" class="switch ${Scene.showNames ? "on" : ""}" id="mNames" role="switch" aria-checked="${Scene.showNames}" aria-label="위성 이름 항상 표시"></button></label>
       <label class="toggle-row" style="margin-top:12px"><span>우주 자동 회전<br><small style="color:var(--ink-3)">조작하거나 패널을 열면 잠시 멈춰요</small></span><button type="button" class="switch ${Scene.autoRotate ? "on" : ""}" id="mSpin" role="switch" aria-checked="${Scene.autoRotate}" aria-label="우주 자동 회전"></button></label>
+      ${Native.ok() ? `<label class="toggle-row" style="margin-top:12px"><span>마감 알림<br><small id="mNotifyHint" style="color:var(--ink-3)">${Native.hint()}</small></span><button type="button" class="switch ${Native.on() ? "on" : ""}" id="mNotify" role="switch" aria-checked="${Native.on()}" aria-label="마감 알림"></button></label>` : ""}
       <div class="btn-row" style="margin-top:12px"><button type="button" class="btn sm" id="mCoach">${ico("help", 15)}조작 안내 보기</button></div>
       ${window.ORBIT_NATIVE ? "" : `<h4>앱으로 쓰기</h4><p class="desc" style="margin:0 0 10px">${how}</p>${App.installPrompt ? `<div class="btn-row"><button type="button" class="btn sol sm" id="mInstall">${ico("install", 15)}앱으로 설치</button></div>` : ""}`}
       <h4>데이터</h4>
@@ -350,6 +351,7 @@ const Modal = {
     c.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => this.planet(b.dataset.edit)));
     on("#mAdd", () => this.planet(null)); on("#mCal", () => CalSync.open()); on("#mClose", () => this.close());
     on("#mSpin", e => { const b = e.currentTarget, v = !Scene.autoRotate; Scene.setAutoRotate(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
+    on("#mNotify", e => { const b = e.currentTarget, v = !Native.on(); Native.setOn(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
     on("#mCoach", () => { this.close(); App.coach(true); });
     on("#mNames", e => { const b = e.currentTarget, v = !Scene.showNames; Scene.setNames(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
     on("#mInstall", async () => { const p = App.installPrompt; if (!p) return; p.prompt(); try { await p.userChoice; } catch (e) { /* 무시 */ } App.installPrompt = null; this.close(); });
