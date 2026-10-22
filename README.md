@@ -88,7 +88,8 @@ Google 로그인을 쓰려면 Google Cloud에서 무료 OAuth 클라이언트 ID
 
 | 기기 | 방법 |
 | --- | --- |
-| Windows · Mac (Chrome · Edge) | 배포 주소를 열고 주소창 오른쪽 **설치** 아이콘 → 데스크톱 앱처럼 실행 |
+| Windows | [Microsoft Store](https://apps.microsoft.com/detail/9MVXK376MQSS) 에서 설치, 또는 Chrome · Edge 주소창의 **설치** 아이콘 |
+| Mac (Chrome · Edge) | 배포 주소를 열고 주소창 오른쪽 **설치** 아이콘 → 데스크톱 앱처럼 실행 (Apple Silicon Mac 은 App Store 승인 후 App Store 에서도) |
 | Mac (Safari 17+) | 파일 메뉴 → **Dock에 추가** |
 | 갤럭시 · Android | Chrome 또는 삼성 인터넷 메뉴 → **홈 화면에 추가** / **앱 설치** |
 | iPhone · iPad | Safari 공유 버튼 → **홈 화면에 추가** |
