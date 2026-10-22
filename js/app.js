@@ -4,9 +4,9 @@
 const $ = sel => document.querySelector(sel);
 
 const App = {
-  view: "today", day: null, installPrompt: null, _sub: "",
+  view: "today", day: null, installPrompt: null, _sub: "", _hold: 0, _done: -1, _completing: new Set(),
   init() {
-    Store.load(); this.day = U.today();
+    Store.load(); this.day = U.today(); Juice.init();
     document.querySelectorAll("[data-ico]").forEach(el => { el.outerHTML = ico(el.dataset.ico, 18); });
     Scene.init(); Panel.init(); Calendar.init(); QuickAdd.init(); Palette.init(); Board.init(); Now.init(); ListView.init(); GCal.init(); Native.init();
     $("#gcalBtn").addEventListener("click", () => GCal.headClick());
@@ -38,11 +38,14 @@ const App = {
     Intro.run();
 
   },
+  /* 다시 그리기 전 줄 자리를 재 두었다가, 그린 뒤 새 자리로 미끄러지게 한다 */
   onChange(d) {
+    const snap = d.silent ? null : Juice.snap();
     Scene.sync(d);
     if (!d.silent) { Panel.refresh(); Calendar.render(); Board.render(); ListView.render(); }
     Now.render();
     this.renderHeader(); QuickAdd.refresh();
+    Juice.flip(snap, d.type === "task-add" ? new Set([d.id]) : null);
   },
   setView(v) {
     if (!["today", "all", "list", "calendar"].includes(v)) v = "today";
@@ -68,7 +71,10 @@ const App = {
     const sub = `<span>남은 일 <b>${remain}</b></span><span>완료 <b>${s.done}</b></span>${burn >= 60 || s.doing ? `<span class="s-fire">집중 <b>${U.fmtDuration(burn)}</b></span>` : ""}${s.overdue ? `<span class="s-late">기한 지남 <b>${s.overdue}</b></span>` : ""}`;
     const dEl = $("#todayDate"); if (dEl.textContent !== date) dEl.textContent = date;
     if (sub !== this._sub) { $("#todaySub").innerHTML = sub; this._sub = sub; }
+    if (this._hold > 0) return;   /* 완료 빛이 링에 닿을 때 숫자를 올린다 */
     const pct = s.total ? s.done / s.total : 0, ring = $("#progressRing"), btn = $("#progressBtn");
+    if (this._done >= 0 && s.done > this._done) { btn.classList.remove("bump"); void btn.offsetWidth; btn.classList.add("bump"); }
+    this._done = s.done;
     ring.style.strokeDashoffset = (103.67 * (1 - pct)).toFixed(2);
     const txt = s.total ? `${s.done}/${s.total}` : "0"; const num = $("#progressText"); if (num.textContent !== txt) num.textContent = txt;
     btn.classList.toggle("complete", s.total > 0 && s.done === s.total);
@@ -139,19 +145,49 @@ const App = {
   openToday() { Panel.open("today"); Scene.focusOn(null); },
   openNoDue() { Panel.open("nodue"); Scene.focusOn(null); },
 
-  startTask(id) {
+  /* 점화: 누른 자리에서 불덩이가 곡선을 그리며 태양으로 날아가 터진다. 3D 위성도 제자리에서 태양으로 날아간다 */
+  startTask(id, src) {
     const t = Store.task(id); if (!t || t.status === "doing") return;
+    const el = src && src.isConnected ? src : null, from = el ? Juice.center(el) : null;
+    if (el) { el.classList.remove("j-ign"); void el.offsetWidth; el.classList.add("j-ign"); }
+    if (!Scene.lastPos.has(id)) { const m = this.moonAt(id); if (m) Scene.lastPos.set(id, { x: m.x, y: m.y, t0: Scene.time }); }
     Store.startTask(id);
-    const s = Scene.sun; FX.ring(s.X, s.Y, s.R, "#ffd59a", 260, 1); FX.ring(s.X, s.Y, s.R * 0.8, "#ff8a4a", 180, 0.8); FX.burst(s.X, s.Y, "#ffb060", 40, 1.5);
+    Juice.ignite(from, () => Now.ignite());
     this.toast("flame", `「${t.title}」 점화 · 집중을 시작해요`);
   },
-  completeTask(id) {
+  stopTask(id) {
+    const t = Store.task(id); if (!t || t.status !== "doing") return;
+    Store.stopTask(id); Juice.sfx("pause"); Juice.buzz("pause");
+    this.toast("orbitBack", `「${t.title}」${U.josa(t.title, "을", "를")} 멈추고 궤도로 돌려보냈어요`, () => Store.startTask(id));
+  },
+  /* 완료: 누른 즉시 체크가 터지고(소리 · 진동), 잠깐 뒤 줄이 옆으로 빠져나가며 빛이 상단 진행 링으로 날아가 숫자를 올린다 */
+  completeTask(id, src) {
+    const t = Store.task(id); if (!t || t.status === "done" || this._completing.has(id)) return;
+    const btn = src && src.isConnected ? src : null, row = btn && btn.closest(".b-row, .lv-card, .row, .nowbar, .cal-task, .wk-task");
+    const combo = Juice.check(btn, row && !row.classList.contains("nowbar") ? row : null);
+    if (!btn) { this.commitDone(id, null, null, combo); return; }
+    this._completing.add(id);
+    setTimeout(() => { this._completing.delete(id); this.commitDone(id, btn, row); }, 300);
+  },
+  commitDone(id, btn, row) {
     const t = Store.task(id); if (!t || t.status === "done") return;
-    const title = t.title, res = Store.completeTask(id); if (!res) return;
+    const from = btn && btn.isConnected && btn.getClientRects().length ? Juice.center(btn) : this.moonAt(id);
+    const ghost = row && !row.classList.contains("nowbar") ? Juice.ghost(row) : null;
+    this._hold++;
+    const title = t.title, res = Store.completeTask(id); if (!res) { this._hold--; return; }
+    Juice.playGhost(ghost);
     const sp = res.spawned ? res.spawned.id : null;
     this.toast("check", `「${title}」 완료${res.spawned ? ` · 다음 반복 ${U.relDate(res.spawned.due)}` : ""}`, () => Store.uncompleteTask(id, sp));
-    const s = Store.todayStats();
-    if (s.total && s.done === s.total) setTimeout(() => { const sun = Scene.sun; FX.ring(sun.X, sun.Y, sun.R, "#7ee2a8", 420, 1.6); this.toast("sparkle", "오늘 할 일을 모두 끝냈어요"); }, 700);
+    const s = Store.todayStats(), all = s.total > 0 && s.done === s.total;
+    Juice.toRing(from, () => {
+      this._hold = Math.max(0, this._hold - 1); this.renderHeader();
+      if (all && !this._hold) { const n = Store.todayStats(); if (n.total && n.done === n.total) setTimeout(() => Juice.celebrate({ sub: `완료 ${n.done}개${Store.burnedToday() >= 60 ? ` · 집중 ${U.fmtDuration(Store.burnedToday())}` : ""}` }), 140); }
+    });
+  },
+  /* 3D 위성(또는 태양 곁 불덩이)의 화면 위치 */
+  moonAt(id) {
+    for (const s of Scene.systems.values()) { const m = s.moons.get(id); if (m && !m.hidden && !Scene.isOverlay()) return { x: m.sx, y: m.sy }; }
+    const o = Scene.orbs.get(id); return o && !Scene.isOverlay() ? { x: o.sx, y: o.sy } : null;
   },
   deleteTask(id) {
     const t = Store.removeTask(id); if (!t) return;
@@ -239,6 +275,7 @@ const QuickAdd = {
     if (App.view === "today" && !due) data.myDay = U.today();
     const r = this.form.getBoundingClientRect(); Scene.launch = { x: r.left + 40, y: r.top + 8, t0: Scene.time };
     const t = Store.addTask(data); if (!t) return;
+    Juice.pop(this.form.querySelector(".cmd-go"), "add");
     this.input.value = ""; this.preview = null; this.prio = 0; this.paint();
     const p = Store.planet(t.planetId);
     App.toast("orbit", `「${t.title}」 → ${p ? p.name : ""}${t.due ? ` · ${U.relDate(t.due)}` : ""}`);
@@ -335,6 +372,7 @@ const Modal = {
       <label class="toggle-row"><span>위성 옆에 할 일 이름 항상 표시<br><small style="color:var(--ink-3)">끄면 행성에 마우스를 올렸을 때만 보여요</small></span><button type="button" class="switch ${Scene.showNames ? "on" : ""}" id="mNames" role="switch" aria-checked="${Scene.showNames}" aria-label="위성 이름 항상 표시"></button></label>
       <label class="toggle-row" style="margin-top:12px"><span>우주 자동 회전<br><small style="color:var(--ink-3)">조작하거나 패널을 열면 잠시 멈춰요</small></span><button type="button" class="switch ${Scene.autoRotate ? "on" : ""}" id="mSpin" role="switch" aria-checked="${Scene.autoRotate}" aria-label="우주 자동 회전"></button></label>
       ${Native.ok() ? `<label class="toggle-row" style="margin-top:12px"><span>마감 알림<br><small id="mNotifyHint" style="color:var(--ink-3)">${Native.hint()}</small></span><button type="button" class="switch ${Native.on() ? "on" : ""}" id="mNotify" role="switch" aria-checked="${Native.on()}" aria-label="마감 알림"></button></label>` : ""}
+      <label class="toggle-row" style="margin-top:12px"><span>효과음<br><small style="color:var(--ink-3)">완료 · 점화할 때 짧은 소리를 들려줘요</small></span><button type="button" class="switch ${Juice.on() ? "on" : ""}" id="mSfx" role="switch" aria-checked="${Juice.on()}" aria-label="효과음"></button></label>
       <div class="btn-row" style="margin-top:12px"><button type="button" class="btn sm" id="mCoach">${ico("help", 15)}조작 안내 보기</button></div>
       ${window.ORBIT_NATIVE ? "" : `<h4>앱으로 쓰기</h4><p class="desc" style="margin:0 0 10px">${how}</p>${App.installPrompt ? `<div class="btn-row"><button type="button" class="btn sol sm" id="mInstall">${ico("install", 15)}앱으로 설치</button></div>` : ""}`}
       <h4>데이터</h4>
@@ -362,6 +400,7 @@ const Modal = {
     on("#mSpin", e => { const b = e.currentTarget, v = !Scene.autoRotate; Scene.setAutoRotate(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
     on("#mNotify", e => { const b = e.currentTarget, v = !Native.on(); Native.setOn(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
     on("#mCoach", () => { this.close(); App.coach(true); });
+    on("#mSfx", e => { const b = e.currentTarget, v = !Juice.on(); Store.setSetting("sfx", v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); if (v) Juice.sfx("done"); });
     on("#mNames", e => { const b = e.currentTarget, v = !Scene.showNames; Scene.setNames(v); b.classList.toggle("on", v); b.setAttribute("aria-checked", v); });
     on("#mInstall", async () => { const p = App.installPrompt; if (!p) return; p.prompt(); try { await p.userChoice; } catch (e) { /* 무시 */ } App.installPrompt = null; this.close(); });
     on("#mExport", () => { try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([Store.exportJSON()], { type: "application/json" })); a.download = `orbit-todo-${U.today()}.json`; a.click(); App.toast("download", "JSON 파일로 내보냈어요"); } catch (e) { App.toast("alert", "내보내지 못했어요. 복사를 이용해 주세요"); } });

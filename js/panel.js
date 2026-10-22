@@ -187,18 +187,18 @@ ${extra}
     switch (act) {
       case "close": this.close(); break;
       case "pick-planet": this.planetPicker(btn); break;
-      case "toggle-done": case "row-check": if (!t) break; if (t.status === "done") Store.uncompleteTask(t.id); else App.completeTask(t.id); break;
+      case "toggle-done": case "row-check": if (!t) break; if (t.status === "done") Store.uncompleteTask(t.id); else App.completeTask(t.id, btn); break;
       case "prio": if (t) Store.updateTask(tid, { priority: +btn.dataset.v }); break;
       case "row-prio": if (t) PrioMenu.open(btn, t.priority || 0, v => Store.updateTask(t.id, { priority: v })); break;
       case "triage": Modal.triage(Store.todayTasks().filter(x => x.status === "todo" && !x.priority).map(x => x.id)); break;
-      case "start": App.startTask(tid); break;
-      case "stop": Store.stopTask(tid); App.toast("orbitBack", "궤도로 돌아왔어요 · 타이머 일시정지"); break;
-      case "row-fire": if (!t) break; if (t.status === "doing") { Store.stopTask(t.id); App.toast("orbitBack", "궤도로 돌아왔어요"); } else App.startTask(t.id); break;
+      case "start": App.startTask(tid, btn); break;
+      case "stop": App.stopTask(tid); break;
+      case "row-fire": if (!t) break; if (t.status === "doing") App.stopTask(t.id); else App.startTask(t.id, btn); break;
       case "toggle-myday": if (!t) break; Store.updateTask(tid, { myDay: t.myDay === today ? null : today }); App.toast("sun", t.myDay === today ? "오늘 할 일에 추가했어요" : "오늘 할 일에서 뺐어요"); break;
       case "suggest-add": if (!t) break; Store.updateTask(tid, { myDay: today }); App.toast("sun", `「${t.title}」 오늘 할 일에 추가`); break;
       case "cal-add": CalSync.addOne(tid, btn.dataset.to); break;
       case "due": if (t) Store.updateTask(tid, { due: btn.dataset.v || null, time: btn.dataset.v ? t.time : null }); break;
-      case "step-toggle": { const li = btn.closest("[data-step]"), s = t.steps.find(x => x.id === li.dataset.step); Store.updateStep(tid, s.id, { done: !s.done }); break; }
+      case "step-toggle": { const li = btn.closest("[data-step]"), s = t.steps.find(x => x.id === li.dataset.step); if (!s.done) Juice.pop(btn, "step"); Store.updateStep(tid, s.id, { done: !s.done }); break; }
       case "step-del": Store.removeStep(tid, btn.closest("[data-step]").dataset.step); break;
       case "delete": App.deleteTask(tid); break;
       case "edit-planet": Modal.planet(this.id); break;

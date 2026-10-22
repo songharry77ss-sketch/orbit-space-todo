@@ -104,8 +104,8 @@ const ListView = {
       case "by": this.by = b.dataset.by; Store.setSetting("listBy", this.by); this.addKey = null; this.render(); break;
       case "done-toggle": this.showDone = !this.showDone; Store.setSetting("listDone", this.showDone); this.render(); break;
       case "add": { const col = b.closest(".lv-col"); this.addKey = this.addKey === col.dataset.key ? null : col.dataset.key; this.renderCols(); break; }
-      case "check": if (!t) break; if (t.status === "done") Store.uncompleteTask(t.id); else App.completeTask(t.id); break;
-      case "fire": if (!t) break; if (t.status === "doing") { Store.stopTask(t.id); App.toast("orbitBack", "궤도로 돌아왔어요"); } else App.startTask(t.id); break;
+      case "check": if (!t) break; if (t.status === "done") Store.uncompleteTask(t.id); else App.completeTask(t.id, b); break;
+      case "fire": if (!t) break; if (t.status === "doing") App.stopTask(t.id); else App.startTask(t.id, b); break;
     }
   },
   onKey(e) {

@@ -59,7 +59,7 @@ const Scene = {
   moonR(t) { return ([0.24, 0.32, 0.27, 0.22][t.priority || 0]) * (this.narrow ? 1.45 : 1.12) * (this.touch ? 1.1 : 1); },
   layout() {
     const burning = this.orbs.size > 0, n = this.order.length;
-    const top = this.narrow ? 124 : 92, bottom = this.H - (this.narrow ? 84 : 100) - (burning ? this.nowH : 0);
+    const top = this.narrow ? 108 : 92, bottom = this.H - (this.narrow ? 84 : 100) - (burning ? this.nowH : 0) - (this.narrow ? this.dockH || 0 : 0);
     const left = this.narrow ? 6 : 28 + (this.boardW || 0), right = this.W - (this.narrow ? 6 : 28) - (this.panelOpen && !this.narrow ? this.panelW() : 0);
     this.area = { top, bottom, left, right };
     /* 궤도 반지름은 순서로, 각도는 만든 순서로 정한다 → 순서를 바꾸면 행성이 제자리에서 안팎으로만 움직인다 */
@@ -95,6 +95,10 @@ const Scene = {
   },
   setPanel(open) { this.panelOpen = open; this.layout(); },
   setBoard(w) { if (this.boardW === w) return; this.boardW = w; this.layout(); },
+  /* 휴대폰: 아래에 붙은 할 일 목록 높이만큼 우주를 위로 */
+  setDock(h) { if (Math.abs((this.dockH || 0) - h) < 2) return; this.dockH = h; this.layout(); },
+  /* 점화 순간 태양이 한 번 크게 타오른다 */
+  kick() { this.sun.heat = Math.min(1.3, this.sun.heat + 0.6); },
   project(p) { const c = M4.xf(this.cam.VP, p[0], p[1], p[2]), w = c[3] || 1e-6; return { x: (c[0] / w * 0.5 + 0.5) * this.W, y: (0.5 - c[1] / w * 0.5) * this.H, w }; },
   unproject(x, y, depth) {
     const inv = this.cam.inv || (this.cam.inv = M4.inv(this.cam.VP)); if (!inv) return [0, 0, 0];
@@ -420,11 +424,13 @@ const Scene = {
         const tries = [[0, s.lw, s.lh], [1, s.sw, s.sh], [2, s.cw, 18]];
         search: for (const [m, w, h] of tries) {
           if (m === 0 && (!hasList || other)) continue;
+          if (this.lean && m < 2) continue;
           for (const [f, d] of oris) {
             const q = rect(s, f, d, w, h);
             if (m === 0 ? !(q[0] > 4 && q[2] < W - 4 && q[1] > A.top - 24 && q[3] < A.bottom + 30) : !(q[0] > -8 && q[2] < W + 8 && q[1] > 36)) continue;
             if (placed.some(p => hit(p, q))) continue;
             if (m === 0 && discs.some(p => p[4] !== s.id && hit(p, q))) continue;
+            if (m === 1 && hit(discs[0], q)) continue;
             mode = m; ori = [f, d]; box = q; break search;
           }
         }

@@ -136,7 +136,7 @@ const Calendar = {
     const act = e.target.closest("[data-act]"), task = e.target.closest(".cal-task, .wk-task"), col = e.target.closest(".cal-cell, .wk-col");
     if (act && act.dataset.act === "check" && task) {
       e.stopPropagation(); const t = Store.task(task.dataset.id); if (!t) return;
-      if (t.status === "done") Store.uncompleteTask(t.id); else App.completeTask(t.id); return;
+      if (t.status === "done") Store.uncompleteTask(t.id); else App.completeTask(t.id, act); return;
     }
     if (task) { e.stopPropagation(); App.openTask(task.dataset.id); return; }
     if (act && act.dataset.act === "add" && col) { this.addDate = col.dataset.date; this.render(); return; }
