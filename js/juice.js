@@ -62,7 +62,7 @@ const Juice = {
     /* rAF 시각이 앞 프레임보다 이를 수 있어 0 밑으로는 내려가지 않게 */
     const dt = this.last ? U.clamp((ts - this.last) / 1000, 0, 0.04) : 0.016; this.last = ts;
     const ctx = this.ctx; ctx.clearRect(0, 0, this.W, this.H);
-    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    ctx.save(); ctx.globalCompositeOperation = this.dark === false ? "source-over" : "lighter";
     for (let i = this.comets.length - 1; i >= 0; i--) {
       const m = this.comets[i]; m.t += dt; const k = Math.min(1, m.t / m.dur), e = 0.3 * k + 0.7 * k * k * (3 - 2 * k) * (0.6 + 0.4 * k), u = 1 - e;
       const x = u * u * m.a.x + 2 * u * e * m.c.x + e * e * m.b.x, y = u * u * m.a.y + 2 * u * e * m.c.y + e * e * m.b.y;
@@ -172,6 +172,7 @@ const Juice = {
   /* 완료 빛이 상단의 진행 링으로 날아가 숫자를 올린다 */
   toRing(from, onArrive) {
     const btn = document.getElementById("progressBtn"), svg = btn && btn.querySelector("svg");
+    if (btn && btn.closest("[hidden]")) { if (onArrive) onArrive(); return; }
     if (!svg || !from || this.reduced || !svg.getClientRects().length) { if (onArrive) onArrive(); return; }
     const to = this.center(svg);
     this.comet(from, to, { color: "#7ee2a8", core: "#f2fff8", size: 3.2, dur: U.clamp(Math.hypot(to.x - from.x, to.y - from.y) / 1500, 0.45, 0.75), arc: from.x < to.x ? -0.28 : 0.28, onEnd: () => {
@@ -180,13 +181,21 @@ const Juice = {
     } });
   },
   /* 점화: 누른 자리에서 불덩이가 곡선을 그리며 태양으로 날아가 터진다 */
-  ignite(from, onArrive) {
+  /* to: 오늘 화면 집중 카드의 태양 자리. 없으면 우주 탭의 태양으로 */
+  ignite(from, onArrive, to) {
     this.sfx("whoosh"); this.buzz("start");
+    if (to && from && !this.reduced) {
+      this.flash(from.x, from.y, "#ffb060", 24, 0.3); this.sparks(from.x, from.y, ["#ffd59a", "#ff8a3c"], 10, 0.55);
+      this.comet(from, to, { color: "#ff9a4a", core: "#fff4dc", size: 4.6, fire: true, dur: U.clamp(Math.hypot(to.x - from.x, to.y - from.y) / 1300, 0.35, 0.7), arc: from.x < to.x ? -0.22 : 0.22, onEnd: () => {
+        this.sfx("ignite"); this.flash(to.x, to.y, "#ffcf8a", 70, 0.5); this.ring(to.x, to.y, "#ffd59a", 20, 60, 0.7, 2.4); this.sparks(to.x, to.y, ["#ffd59a", "#ff8a3c", "#fff1d6"], 22, 1); if (onArrive) onArrive();
+      } });
+      return;
+    }
     const sun = Scene.sun, ok = from && !this.reduced && !Scene.isOverlay() && sun.sr > 2;
     if (from) { this.flash(from.x, from.y, "#ffb060", 24, 0.3); this.sparks(from.x, from.y, ["#ffd59a", "#ff8a3c"], 10, 0.55); }
     if (!ok) { setTimeout(() => this.ignited(onArrive, !Scene.isOverlay()), from ? 160 : 380); return; }
-    const to = { x: sun.sx, y: sun.sy };
-    this.comet(from, to, { color: "#ff9a4a", core: "#fff4dc", size: 4.6, fire: true, dur: U.clamp(Math.hypot(to.x - from.x, to.y - from.y) / 1300, 0.42, 0.78), arc: from.x < to.x ? -0.22 : 0.22, onEnd: () => this.ignited(onArrive, true) });
+    const at = { x: sun.sx, y: sun.sy };
+    this.comet(from, at, { color: "#ff9a4a", core: "#fff4dc", size: 4.6, fire: true, dur: U.clamp(Math.hypot(at.x - from.x, at.y - from.y) / 1300, 0.42, 0.78), arc: from.x < at.x ? -0.22 : 0.22, onEnd: () => this.ignited(onArrive, true) });
   },
   ignited(cb, atSun) {
     this.sfx("ignite");
@@ -229,8 +238,8 @@ const Juice = {
   },
 
   /* ── 다시 그릴 때 줄이 미끄러지게 (FLIP) ── */
-  SEL: ".b-row[data-task], .lv-card[data-id], .sheet .row[data-task]",
-  key(el) { return (el.classList.contains("b-row") ? "b" : el.classList.contains("lv-card") ? "l" : "s") + ":" + (el.dataset.task || el.dataset.id); },
+  SEL: ".view:not([hidden]) .tk[data-task], .uni-card .tk[data-task]",
+  key(el) { return (el.closest(".uni-card") ? "u" : "v") + ":" + el.dataset.task; },
   snap() {
     if (this.reduced) return null; const m = new Map();
     document.querySelectorAll(this.SEL).forEach(el => { const r = el.getBoundingClientRect(); if (r.height) m.set(this.key(el), r); });
@@ -252,10 +261,10 @@ const Juice = {
   /* 사라지는 줄: 다시 그리기 전에 복제해 두었다가, 그린 뒤 같은 자리에서 옆으로 빠져나가게 */
   ghost(el) {
     if (!el || !el.isConnected || this.reduced) return null;
-    const host = el.closest(".board, .listview, .sheet"); if (!host) return null;
+    const host = el.closest(".view, .sheet, .uni-card"); if (!host) return null;
     const hr = host.getBoundingClientRect(), r = el.getBoundingClientRect(); if (!r.height) return null;
     const g = el.cloneNode(true); g.classList.add("j-ghost"); g.classList.remove("hov"); g.removeAttribute("data-task"); g.removeAttribute("data-id"); g.removeAttribute("tabindex"); g.setAttribute("aria-hidden", "true");
-    Object.assign(g.style, { position: "absolute", left: `${r.left - hr.left}px`, top: `${r.top - hr.top}px`, width: `${r.width}px`, height: `${r.height}px`, margin: "0", zIndex: "6", pointerEvents: "none" });
+    Object.assign(g.style, { position: "absolute", left: `${r.left - hr.left + host.scrollLeft}px`, top: `${r.top - hr.top + host.scrollTop}px`, width: `${r.width}px`, height: `${r.height}px`, margin: "0", zIndex: "6", pointerEvents: "none" });
     return { g, host };
   },
   playGhost(o) { if (!o) return; o.host.appendChild(o.g); setTimeout(() => o.g.remove(), 700); },

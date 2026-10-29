@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ORBIT 우주 할 일</title>
 <meta name="description" content="행성은 카테고리, 위성은 할 일. 실제 행성 사진으로 만든 우주에서 할 일을 태양에 올려 불태우는 투두리스트.">
-<meta name="theme-color" content="#04050b">
+<meta name="theme-color" content="#0F1115" id="themeColor">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ORBIT">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
@@ -19,12 +19,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/calendar-ux.css">
-<link rel="stylesheet" href="css/experience.css">
-<link rel="stylesheet" href="css/mobile-stability.css">
+<link rel="stylesheet" href="css/space.css">
+<link rel="stylesheet" href="css/orbit.css">
 </head>
-<body data-view="today">
+<body data-tab="today">
 <div id="intro" class="intro" aria-hidden="true">
   <div class="in-stars"></div>
   <div class="in-flash"></div>
@@ -47,91 +45,105 @@
 </div>
 <script>(function () { var el = document.getElementById("intro"); window.ORBIT_INTRO_T = performance.now(); try { if (navigator.webdriver || /[?&]nointro/.test(location.search)) { el.remove(); return; } if (localStorage.getItem("orbit.intro")) el.classList.add("quick"); } catch (e) {} document.body.classList.add("intro-on"); var ms = el.querySelectorAll(".in-moon"), a0 = performance.now(); (function step(t) { if (!el.isConnected) return; var a = (t - a0) / 3400 * 6.2832, x = (100 + 86 * Math.cos(a)).toFixed(2), y = (100 + 36 * Math.sin(a)).toFixed(2); for (var i = 0; i < ms.length; i++) { ms[i].setAttribute("cx", x); ms[i].setAttribute("cy", y); } requestAnimationFrame(step); })(a0); setTimeout(function () { if (typeof Intro === "undefined" || !Intro.done) { el.classList.add("out"); document.body.classList.remove("intro-on"); setTimeout(function () { el.remove(); }, 1200); } }, 6000); })();</script>
 
-<main id="stage" aria-label="우주 할 일 지도">
-  <canvas id="gl" aria-hidden="true"></canvas>
-  <canvas id="fx" aria-hidden="true"></canvas>
-  <div id="labels" class="labels"></div>
-  <div id="mtags" class="mtags" aria-hidden="true"></div>
-  <div id="sunHint" class="sun-hint" hidden></div>
-  <div id="focus" class="focus" hidden aria-label="집중 중인 할 일"></div>
-  <div id="tooltip" class="tooltip" hidden></div>
-</main>
+<div class="app" id="app">
+  <aside class="side" id="side" aria-label="메뉴">
+    <div class="side-brand"><svg width="24" height="24" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="3.8" fill="#FF8A3D"/><ellipse cx="11" cy="11" rx="9.4" ry="4" transform="rotate(-24 11 11)" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>ORBIT</span></div>
+    <nav class="side-nav" id="sideNav" aria-label="화면"></nav>
+    <div class="side-sec"><span>행성</span><button type="button" class="icon-btn sm" id="sideAddPlanet" aria-label="새 행성"><span data-ico="plus"></span></button></div>
+    <div class="side-planets" id="sidePlanets"></div>
+    <div class="side-foot">
+      <button type="button" class="nav" id="sideSearch"><span data-ico="search"></span>검색<kbd>/</kbd></button>
+      <button type="button" class="nav" id="sideSettings"><span data-ico="sliders"></span>설정</button>
+    </div>
+  </aside>
 
-<aside id="board" class="board" aria-label="할 일 보드"></aside>
-<button type="button" id="boardPill" class="board-pill" hidden aria-label="오늘 할 일 목록 열기"></button>
-<div class="focus-chip" id="focusChip" hidden></div>
-<div class="view-ctl" id="viewCtl" role="toolbar" aria-label="시점 조작">
-  <button type="button" class="vc-btn vc-zoom" data-vc="in" aria-label="확대" title="확대  +"><span data-ico="plus"></span></button>
-  <button type="button" class="vc-btn vc-zoom" data-vc="out" aria-label="축소" title="축소  −"><span data-ico="minus"></span></button>
-  <span class="vc-sep" aria-hidden="true"></span>
-  <button type="button" class="vc-btn" data-vc="reset" aria-label="전체 보기" title="전체 보기  0"><span data-ico="fit"></span></button>
-  <button type="button" class="vc-btn" data-vc="spin" id="vcSpin" aria-label="자동 회전" title="자동 회전  R"><span data-ico="pause"></span></button>
-  <button type="button" class="vc-btn" data-vc="help" aria-label="조작 안내" title="조작 안내  ?"><span data-ico="help"></span></button>
+  <main class="main" id="main">
+    <header class="top" id="top">
+      <div class="top-row">
+        <button type="button" class="top-back" id="topBack" hidden><span data-ico="chevLeft"></span><span id="topBackLbl">행성</span></button>
+        <h1 class="top-title" id="viewTitle">오늘</h1>
+        <div class="top-actions" id="topActions"><button type="button" class="ib" id="searchBtn" aria-label="할 일 검색"><span data-ico="search"></span></button><button type="button" class="ib" id="settingsBtn" aria-label="설정"><span data-ico="sliders"></span></button></div>
+      </div>
+      <div class="top-sub" id="viewSub"></div>
+    </header>
+    <aside id="demoBanner" class="banner" hidden aria-label="예시 둘러보기"><b>예시로 둘러보는 중</b><span>자유롭게 눌러 보세요</span><button type="button">내 할 일로 시작</button></aside>
+
+    <form id="cmd" class="cmd" autocomplete="off" aria-label="할 일 추가">
+      <div class="cmd-head"><span>할 일 추가</span><button type="button" class="ib sm plain cmd-x" id="cmdClose" aria-label="닫기"><span data-ico="x"></span></button></div>
+      <input id="cmdInput" type="text" enterkeyhint="send" placeholder="새 할 일" aria-label="새 할 일">
+      <button type="button" class="cmd-planet" id="cmdPlanet" aria-label="행성 선택" aria-expanded="false" aria-controls="popPlanet"></button>
+      <button type="button" class="cmd-chip prio" id="cmdPrio" aria-label="우선순위" aria-expanded="false" aria-controls="popPrio"></button>
+      <button type="button" class="cmd-chip" id="cmdDate" aria-label="마감일" aria-expanded="false" aria-controls="popDate"><span data-ico="calendar"></span><span class="txt">오늘</span></button>
+      <button type="submit" class="cmd-go" aria-label="추가"><span data-ico="plus"></span><span class="lbl">추가</span></button>
+      <p class="cmd-hint-line" id="cmdHintLine">#행성 · !1 · 「내일 오후 3시」처럼 써도 알아들어요</p>
+      <div class="pop" id="popPlanet" hidden></div>
+      <div class="pop" id="popDate" hidden></div>
+      <div class="pop" id="popPrio" hidden></div>
+      <span id="cmdHint" class="sr-only" aria-live="polite" aria-atomic="true"></span>
+    </form>
+
+    <div class="views" id="views">
+      <section class="view" id="vToday" data-tab="today" aria-label="오늘"></section>
+      <section class="view" id="vUpcoming" data-tab="upcoming" aria-label="예정" hidden>
+        <div class="view-in">
+          <div class="up-tools"><div class="seg" id="upMode" role="tablist" aria-label="예정 보기"><button type="button" data-mode="list" role="tab">목록</button><button type="button" data-mode="cal" role="tab">달력</button></div></div>
+          <div id="upList"></div>
+          <section id="calendar" class="calendar" hidden aria-label="달력">
+            <div class="cal-head">
+              <div><h2 class="cal-title" id="calTitle"></h2><p class="cal-sub" id="calSub"></p></div>
+              <div class="cal-nav">
+                <div class="cal-seg" id="calMode" role="tablist" aria-label="달력 보기"><button type="button" data-mode="month" role="tab">월</button><button type="button" data-mode="week" role="tab">주</button></div>
+                <button type="button" class="gc-btn" id="gcalBtn" aria-label="Google 캘린더"></button>
+                <button type="button" class="icon-btn sm" id="calPrev" aria-label="이전 달"><span data-ico="chevLeft"></span></button>
+                <button type="button" class="pill-btn" id="calToday">오늘</button>
+                <button type="button" class="icon-btn sm" id="calNext" aria-label="다음 달"><span data-ico="chevRight"></span></button>
+              </div>
+            </div>
+            <div class="cal-weekdays" aria-hidden="true"><span class="sun-d">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat-d">토</span></div>
+            <div class="cal-grid" id="calGrid"></div>
+            <div class="cal-foot" id="calFoot"></div>
+          </section>
+        </div>
+      </section>
+      <section class="view" id="vPlanets" data-tab="planets" aria-label="행성" hidden></section>
+      <section class="view universe force-dark" id="vUniverse" data-tab="universe" aria-label="우주" hidden>
+        <div id="stage" aria-label="우주 할 일 지도">
+          <canvas id="gl" aria-hidden="true"></canvas>
+          <canvas id="fx" aria-hidden="true"></canvas>
+          <div id="labels" class="labels"></div>
+          <div id="mtags" class="mtags" aria-hidden="true"></div>
+          <div id="sunHint" class="sun-hint" hidden></div>
+          <div id="focus" class="focus" hidden></div>
+          <div id="tooltip" class="tooltip" hidden></div>
+        </div>
+        <div class="uni-top"><div class="seg" id="uniFilter" role="tablist" aria-label="보여 줄 위성"><button type="button" data-f="today" role="tab">오늘</button><button type="button" data-f="all" role="tab">전체</button></div><span class="grow"></span></div>
+        <div class="focus-chip" id="focusChip" hidden></div>
+        <div class="view-ctl" id="viewCtl" role="toolbar" aria-label="시점 조작">
+          <button type="button" class="vc-btn vc-zoom" data-vc="in" aria-label="확대" title="확대  +"><span data-ico="plus"></span></button>
+          <button type="button" class="vc-btn vc-zoom" data-vc="out" aria-label="축소" title="축소  −"><span data-ico="minus"></span></button>
+          <span class="vc-sep" aria-hidden="true"></span>
+          <button type="button" class="vc-btn" data-vc="reset" aria-label="전체 보기" title="전체 보기  0"><span data-ico="fit"></span></button>
+          <button type="button" class="vc-btn" data-vc="spin" id="vcSpin" aria-label="자동 회전" title="자동 회전  R"><span data-ico="pause"></span></button>
+          <button type="button" class="vc-btn" data-vc="help" aria-label="조작 안내" title="조작 안내  ?"><span data-ico="help"></span></button>
+        </div>
+        <div class="uni-card" id="uniCard"></div>
+        <div class="coach" id="coach" hidden role="dialog" aria-label="조작 안내"></div>
+      </section>
+    </div>
+  </main>
 </div>
-<div class="coach" id="coach" hidden role="dialog" aria-label="조작 안내"></div>
 
-<header class="topbar">
-  <div class="tb-left">
-    <div class="brand" aria-label="ORBIT">
-      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="3.6" fill="#f4a259"/><ellipse cx="11" cy="11" rx="9.4" ry="4" transform="rotate(-24 11 11)" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="1.2"/><circle cx="19.2" cy="7.6" r="1.5" fill="currentColor"/></svg>
-      <span>Orbit</span>
-    </div>
-    <span class="tb-div" aria-hidden="true"></span>
-    <div class="today"><div class="today-date" id="todayDate">오늘</div><div class="today-sub" id="todaySub"></div></div>
-  </div>
-  <nav class="seg" id="seg" role="tablist" aria-label="보기 전환">
-    <button type="button" class="seg-btn" data-view="today" role="tab">오늘</button>
-    <button type="button" class="seg-btn" data-view="all" role="tab">전체</button>
-    <button type="button" class="seg-btn" data-view="list" role="tab">목록</button>
-    <button type="button" class="seg-btn" data-view="calendar" role="tab">캘린더</button>
-    <span class="seg-thumb" aria-hidden="true"></span>
-  </nav>
-  <div class="tb-right">
-    <button type="button" class="search-btn" id="searchBtn" aria-label="할 일 검색"><span data-ico="search"></span><span class="lbl">검색</span><kbd>/</kbd></button>
-    <button type="button" class="ring-btn" id="progressBtn" aria-label="오늘의 미션 열기">
-      <svg viewBox="0 0 40 40" width="22" height="22" aria-hidden="true"><circle class="ring-bg" cx="20" cy="20" r="16.5"></circle><circle class="ring-fg" id="progressRing" cx="20" cy="20" r="16.5"></circle></svg>
-      <span class="ring-num" id="progressText">0</span>
-    </button>
-    <button type="button" class="icon-btn" id="settingsBtn" aria-label="행성 관리와 설정" title="설정"><span data-ico="sliders"></span></button>
-  </div>
-</header>
-
-<section id="listView" class="listview" hidden aria-label="모든 할 일 목록"></section>
-<aside id="demoBanner" class="demo-banner" hidden aria-label="예시 둘러보기"><span><i aria-hidden="true"></i><b>예시로 둘러보는 중</b><small>자유롭게 살펴보세요</small></span><button type="button">내 할 일로 시작 <span aria-hidden="true">→</span></button></aside>
-<section id="nowbar" class="nowbar" hidden aria-label="지금 집중 중"></section>
-<section id="calendar" class="calendar" hidden aria-label="캘린더">
-  <div class="cal-head">
-    <div><h2 class="cal-title" id="calTitle"></h2><p class="cal-sub" id="calSub"></p></div>
-    <div class="cal-nav">
-      <button type="button" class="gc-btn" id="gcalBtn" aria-label="Google 캘린더"></button>
-      <div class="cal-seg" id="calMode" role="tablist" aria-label="캘린더 보기"><button type="button" data-mode="month" role="tab">월</button><button type="button" data-mode="week" role="tab">주</button></div>
-      <button type="button" class="icon-btn sm" id="calPrev" aria-label="이전 달"><span data-ico="chevLeft"></span></button>
-      <button type="button" class="pill-btn" id="calToday">오늘</button>
-      <button type="button" class="icon-btn sm" id="calNext" aria-label="다음 달"><span data-ico="chevRight"></span></button>
-    </div>
-  </div>
-  <div class="cal-weekdays" aria-hidden="true"><span class="sun-d">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat-d">토</span></div>
-  <div class="cal-grid" id="calGrid"></div>
-  <div class="cal-foot" id="calFoot"></div>
-</section>
-
-<form id="cmd" class="cmd" autocomplete="off">
-  <button type="button" class="cmd-planet" id="cmdPlanet" aria-label="행성 선택" aria-expanded="false" aria-controls="popPlanet"></button>
-  <input id="cmdInput" type="text" enterkeyhint="send" placeholder="새 할 일" aria-label="새 할 일">
-  <button type="button" class="cmd-chip prio" id="cmdPrio" aria-label="우선순위" aria-expanded="false" aria-controls="popPrio"></button>
-  <button type="button" class="cmd-chip" id="cmdDate" aria-label="마감일" aria-expanded="false" aria-controls="popDate"><span data-ico="calendar"></span><span class="txt">오늘</span></button>
-  <button type="submit" class="cmd-go" aria-label="추가"><span data-ico="plus"></span></button>
-  <div class="pop" id="popPlanet" hidden></div>
-  <div class="pop" id="popDate" hidden></div>
-  <div class="pop" id="popPrio" hidden></div>
-  <span id="cmdHint" class="sr-only" aria-live="polite" aria-atomic="true"></span>
-</form>
+<nav class="tabbar" id="tabbar" aria-label="화면"></nav>
+<button type="button" class="fab" id="fab" aria-label="할 일 추가"><span data-ico="plus"></span></button>
+<div class="composer-scrim" id="composerScrim" hidden></div>
 
 <div id="sheetBackdrop" class="sheet-backdrop" hidden aria-hidden="true"></div>
-<aside id="sheet" class="sheet" hidden tabindex="-1" aria-label="상세 패널">
+<aside id="sheet" class="sheet" hidden tabindex="-1" aria-label="할 일 상세">
   <div class="sheet-grip" id="sheetGrip" aria-hidden="true"><i></i></div>
   <div class="sheet-inner" id="sheetInner"></div>
 </aside>
+
+<div id="focusScreen" class="fs force-dark" hidden role="dialog" aria-modal="true" aria-label="집중"></div>
 
 <div id="palette" class="palette" hidden>
   <div class="pal-backdrop" data-close></div>
@@ -164,12 +176,12 @@
 <script src="js/calendar.js"></script>
 <script src="js/calsync.js"></script>
 <script src="js/gcal.js"></script>
-<script src="js/board.js"></script>
-<script src="js/now.js"></script>
-<script src="js/listview.js"></script>
+<script src="js/views.js"></script>
+<script src="js/focus.js"></script>
 <script src="js/native.js"></script>
 <script src="js/juice.js"></script>
 <script src="js/intro.js"></script>
+<script src="js/modal.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

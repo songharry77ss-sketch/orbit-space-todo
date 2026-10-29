@@ -41,11 +41,11 @@ const ICONS = {
   hand: '<path d="M8 11V5.5a1.5 1.5 0 0 1 3 0V10m0-4.5a1.5 1.5 0 0 1 3 0V10m0-3a1.5 1.5 0 0 1 3 0v6.5c0 4-2.5 7-6.5 7-2.6 0-4.3-1.3-5.6-3.4L4 14c-.6-1 .6-2.2 1.6-1.6L8 14"/>',
 };
 /* 우선순위: 0 미정 · 1 높음 · 2 보통 · 3 낮음 (신호 막대 아이콘) */
-const PRIO = [{ ko: "미정", color: "#7b8292" }, { ko: "높음", color: "#ff7a59" }, { ko: "보통", color: "#f2c46b" }, { ko: "낮음", color: "#7c9cff" }];
+const PRIO = [{ ko: "미정", color: "var(--p0)" }, { ko: "높음", color: "var(--p1)" }, { ko: "보통", color: "var(--p2)" }, { ko: "낮음", color: "var(--p3)" }];
 const PRIO_ORDER = [1, 2, 3, 0];
 function prioSvg(p, s = 14) {
   const on = p === 1 ? 3 : p === 2 ? 2 : p === 3 ? 1 : 0, c = PRIO[p] ? PRIO[p].color : PRIO[0].color;
-  return `<svg class="prio-ico" width="${s}" height="${s}" viewBox="0 0 16 16" aria-hidden="true">${[[2.5, 9], [6.75, 6], [11, 3]].map(([x, y], i) => `<rect x="${x}" y="${y}" width="3" height="${13 - y}" rx="1" fill="${i < on ? c : "currentColor"}" fill-opacity="${i < on ? 1 : 0.24}"/>`).join("")}</svg>`;
+  return `<svg class="prio-ico" width="${s}" height="${s}" viewBox="0 0 16 16" aria-hidden="true">${[[2.5, 9], [6.75, 6], [11, 3]].map(([x, y], i) => `<rect x="${x}" y="${y}" width="3" height="${13 - y}" rx="1" style="fill:${i < on ? c : "currentColor"};fill-opacity:${i < on ? 1 : 0.3}"/>`).join("")}</svg>`;
 }
 function ico(name, size = 18, extra = "") {
   return `<svg class="ico ${extra}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;

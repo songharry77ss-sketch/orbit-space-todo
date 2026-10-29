@@ -12,7 +12,7 @@ const ViewportState = {
     this.height = document.documentElement.clientHeight || window.innerHeight;
     this.update();
     this.stageObserver = new ResizeObserver(() => {
-      if (typeof Scene === "undefined" || !Scene.stage) return;
+      if (typeof Scene === "undefined" || !Scene.stage || !Scene.active) return;
       const rect = Scene.stage.getBoundingClientRect();
       if (Math.abs(Scene.W - rect.width) > 1 || Math.abs(Scene.H - rect.height) > 1) Scene.measure();
     });
@@ -52,7 +52,7 @@ const ViewportState = {
     root.style.setProperty("--scene-height", `${Math.round(this.height)}px`);
     document.body.classList.toggle("keyboard-open", keyboard);
     this.pinRoot();
-    if (typeof Scene !== "undefined" && Scene.stage) {
+    if (typeof Scene !== "undefined" && Scene.stage && Scene.active) {
       if (Math.abs(Scene.H - this.height) > 1 || Math.abs(Scene.W - width) > 1) Scene.measure();
       else if ((wasKeyboard && !keyboard) || (!editing && !keyboard && Scene._fitDeferred)) Scene.layout();
     }

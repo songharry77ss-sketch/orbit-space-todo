@@ -248,7 +248,7 @@ const GCal = {
     } finally {
       Store.save(); this.busy = false; this.paint();
       if (typeof Calendar !== "undefined") Calendar.render();
-      if (typeof Board !== "undefined" && Board.el) Board.render();
+      if (typeof Views !== "undefined" && Views.el.today) Views.render();
       if (this.again) { this.again = false; this.schedule(); }
     }
     return ok;
@@ -299,7 +299,7 @@ const GCal = {
     if (!this.on() || !this.live() || !this.st().show || this.busy || this._fetching) return;
     const r = this.extRange; if (r && from >= r[0] && to <= r[1]) return;
     this._fetching = true;
-    this.fetchExt(U.addDays(from, -7), U.addDays(to, 7)).catch(() => {}).finally(() => { this._fetching = false; Calendar.render(); });
+    this.fetchExt(U.addDays(from, -7), U.addDays(to, 7)).catch(() => {}).finally(() => { this._fetching = false; Calendar.render(); if (typeof Views !== "undefined") Views.render(); });
   },
   /* merge = true(월간 칸): 제목 없는 「일정 있음」 칸이 여럿이면 한 칸으로 묶어 할 일을 가리지 않게 한다 */
   eventsOn(ds, merge) {
@@ -326,7 +326,7 @@ const GCal = {
       else try { if (this.token && window.google && google.accounts) google.accounts.oauth2.revoke(this.token, () => {}); } catch (_) { /* 무시 */ }
       this.forget(); const st = this.st(); st.on = false; st.map = {}; st.syncToken = null; this.listed = false; this.err = ""; this.ext = []; this.extRange = null;
       try { localStorage.removeItem("orbit-gcal-ext"); } catch (_) { /* 없음 */ }
-      Store.save(); this.paint(); Calendar.render(); if (Board.el) Board.render(); App.toast("calendar", "Google 캘린더 연결을 끊었어요");
+      Store.save(); this.paint(); Calendar.render(); Views.render(); App.toast("calendar", "Google 캘린더 연결을 끊었어요");
     } });
   },
   renderSection() {
@@ -369,7 +369,7 @@ const GCal = {
         if (this.native() && !this.nativeScopes()) { this.titleHelp = true; this.renderSection(); } else this.enableShow(false);
         return;
       }
-      st.show = !st.show; Store.save(); this.renderSection(); if (st.show) this.sync(); else { Calendar.render(); if (Board.el) Board.render(); }
+      st.show = !st.show; Store.save(); this.renderSection(); if (st.show) this.sync(); else { Calendar.render(); Views.render(); }
     });
     const tl = box.querySelector("#gcTitles"); if (tl) tl.addEventListener("click", () => { this.titleHelp = true; this.renderSection(); });
     const tn = box.querySelector("#gcTitleNo"); if (tn) tn.addEventListener("click", () => { this.titleHelp = false; this.renderSection(); });

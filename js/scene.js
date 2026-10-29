@@ -68,8 +68,13 @@ const Scene = {
   moonR(t) { return ([0.24, 0.32, 0.27, 0.22][t.priority || 0]) * (this.narrow ? 1.45 : 1.12) * (this.touch ? 1.1 : 1); },
   layout() {
     const burning = this.orbs.size > 0, n = this.order.length;
-    const top = this.narrow ? 108 : 92, bottom = this.H - (this.narrow ? 84 : 100) - (burning ? this.nowH : 0) - (this.narrow ? this.dockH || 0 : 0) - (this.hintIdle ? 42 : 0);
-    const left = this.narrow ? 6 : 28 + (this.panelOpen && this.W <= 1100 ? 0 : this.boardW || 0), right = this.W - (this.narrow ? 6 : 28) - (this.panelOpen && !this.narrow ? this.panelW() : 0);
+    /* 우주 탭: 왼쪽 메뉴 · 위 머리 · 아래 카드와 탭 · 오른쪽 시점 버튼을 피한 자리에 행성계를 맞춘다 */
+    const rect = id => { try { const el = typeof id === "string" ? document.getElementById(id) : id; return el && !el.hidden && el.getClientRects && el.getClientRects().length ? el.getBoundingClientRect() : null; } catch (_) { return null; } };
+    const cls = c => { try { return !!document.body.classList.contains(c); } catch (_) { return false; } };
+    const side = rect("side"), tabs = rect("tabbar"), head = rect(document.querySelector ? document.querySelector(".uni-top") : null), sheet = cls("sheet-open") && !cls("sheet-modal") ? rect("sheet") : null;
+    const floor = tabs ? tabs.top : this.H;
+    const top = (head ? head.bottom : 0) + (this.narrow ? 4 : 8), bottom = floor - (this.narrow ? 92 : 104) - (burning ? 0 : 0) - (this.hintIdle ? 42 : 0);
+    const left = (side ? side.right : 0) + (this.narrow ? 6 : 24), right = (sheet ? sheet.left : this.W) - (this.narrow ? 6 : 76);
     this.area = { top, bottom, left, right };
     /* 순서대로 한 궤도 위 자리를 차지한다(끄는 중이면 미리 보기 순서) */
     const pd = this.drag && this.drag.kind === "planet" && !this.drag.pending ? this.drag : null, ids = pd ? this.slotOrder(pd) : this.order;
@@ -130,7 +135,20 @@ const Scene = {
   },
 
   /* ── 스토어 → 씬 ── */
-  isOverlay() { return this.view === "calendar" || this.view === "list"; },
+  isOverlay() { return !this.active; },
+  /* 우주 탭이 보일 때만 그린다(다른 탭에서는 배터리 · 발열을 아끼려고 멈춤) */
+  setActive(on) {
+    on = !!on; if (this.active === on) return; this.active = on;
+    if (on) {
+      this.last = 0;
+      requestAnimationFrame(() => {
+        this.measure(); this.sync({ type: "filter" }); this.layout();
+        /* 숨겨진 동안(크기 0) 잡힌 구도는 버리고 바로 맞춘다 */
+        const c = this.cam; c.dist = c.tDist; c.sx = c.tsx; c.sy = c.tsy; c.el = c.tEl;
+      });
+    }
+    else { this.focusOn(null); this.cancelDrag(); this.tip.hidden = true; }
+  },
   setView(v) { this.view = v; if (this.isOverlay()) this.focusOn(null); this.sync({ type: "filter" }); },
   setNowH(h) { if (Math.abs(this.nowH - h) < 2) return; this.nowH = h; this.layout(); },
   setSearch(q) { this.search = (q || "").trim().toLowerCase(); },
@@ -253,6 +271,7 @@ const Scene = {
 
   /* ── 프레임 ── */
   loop(ts) {
+    if (!this.active) { this.last = 0; requestAnimationFrame(t => this.loop(t)); return; }
     const now = ts / 1000, raw = now - (this.last || now), dt = Math.min(0.05, raw); this.last = now;
     if (document.visibilityState === "visible" && raw > 0 && raw < 0.25) { this.perf.ema += (raw - this.perf.ema) * 0.05; this.perf.t += raw; if (this.perf.t > 2.5) { this.perf.t = 0; this.adapt(); } }
     this.time += dt;
@@ -440,7 +459,7 @@ const Scene = {
     /* 화면 위에 떠 있는 UI(보드 · 시점 버튼 · 집중 바)는 1초마다 다시 재서 이름표가 그 밑으로 숨지 않게 한다 */
     if (!this._obT || this.time - this._obT > 1) {
       this._obT = this.time;
-      this._ob = [...["board", "boardPill", "viewCtl", "nowbar", "focusChip", "demoBanner", "sheet", "sunHint"].map(id => document.getElementById(id)), document.querySelector(".topbar")].filter(el => el && !el.hidden).map(el => el.getBoundingClientRect()).filter(q => q.width > 0).map(q => [q.left, q.top, q.right, q.bottom]);
+      this._ob = [...["side", "tabbar", "viewCtl", "focusChip", "uniCard", "sunHint", "coach", "sheet"].map(id => document.getElementById(id)), document.querySelector(".uni-top")].filter(el => el && !el.hidden).map(el => el.getBoundingClientRect()).filter(q => q.width > 0).map(q => [q.left, q.top, q.right, q.bottom]);
     }
     placed.push(...this._ob);
     const anchor = (s, f, d) => [s.sx + (f ? -1 : 1) * s.sr * 0.72, s.sy + (d ? 1 : -1) * s.sr * 0.72];

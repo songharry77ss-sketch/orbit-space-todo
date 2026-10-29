@@ -21,7 +21,7 @@ const FocusScope = {
   items(root) { return [...root.querySelectorAll(this.selector)].filter(el => el.getClientRects().length && !el.closest('[hidden], [inert]')); },
   remember(el = document.activeElement) {
     const row = el?.closest('[data-task], [data-id]');
-    return { node: el, id: el?.id, rowId: row?.dataset.task || row?.dataset.id, action: el?.dataset.act, value: el?.dataset.v, container: el?.closest('#listView, #board, #calendar, #sheet, #nowbar')?.id };
+    return { node: el, id: el?.id, rowId: row?.dataset.task || row?.dataset.id, action: el?.dataset.act, value: el?.dataset.v, container: el?.closest('#views, #calendar, #sheet, #focusScreen, #uniCard')?.id };
   },
   restore(saved) {
     let el = saved?.node;
@@ -31,7 +31,7 @@ const FocusScope = {
       const row = saved.rowId ? [...container.querySelectorAll('[data-task], [data-id]')].find(n => (n.dataset.task || n.dataset.id) === saved.rowId) : container;
       el = saved.action ? [...(row?.querySelectorAll('[data-act]') || [])].find(n => n.dataset.act === saved.action && (saved.value == null || n.dataset.v === saved.value)) : row;
     }
-    if (!el?.isConnected || !el.getClientRects().length || el.closest('[inert]')) el = this.stack.at(-1)?.root || document.querySelector('.seg-btn[aria-selected="true"]');
+    if (!el?.isConnected || !el.getClientRects().length || el.closest('[inert]')) el = this.stack.at(-1)?.root || document.querySelector('.tab.on, .nav.on');
     el?.focus({ preventScroll: true });
   },
   open(root, { modal = true, initial } = {}) {

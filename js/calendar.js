@@ -66,7 +66,7 @@ const Calendar = {
     if (this.mode === "month") this.ym = { y: d.getFullYear(), m: d.getMonth() };
     this.syncQuickAdd(); this.render();
     if (focus) this.grid.querySelector(`[data-date="${ds}"]`)?.focus({ preventScroll: true });
-    if (open) App.openDay(ds);
+    if (open && this.mode === "week") App.openDay(ds);
   },
   weekStart(ds) { const d = U.parseDate(ds); d.setDate(d.getDate() - d.getDay()); return U.dateStr(d); },
   byDate() { const m = new Map(); for (const t of Store.tasks()) { if (!t.due) continue; if (!m.has(t.due)) m.set(t.due, []); m.get(t.due).push(t); } return m; },
@@ -80,7 +80,7 @@ const Calendar = {
     this.el.classList.toggle("week", week);
     document.getElementById("calPrev").setAttribute("aria-label", week ? "이전 주" : "이전 달");
     document.getElementById("calNext").setAttribute("aria-label", week ? "다음 주" : "다음 달");
-    this.agenda.hidden = week || window.innerWidth >= 640;
+    this.agenda.hidden = week;   /* 월간 아래에 고른 날의 목록 */
     if (week) { this.grid.removeAttribute("role"); this.grid.removeAttribute("aria-label"); this.renderWeek(); } else this.renderMonth();
     this.renderFoot();
     if (!this.agenda.hidden && agendaDate === this.selected) this.agenda.querySelector(".cal-agenda-list").scrollTop = agendaTop;
@@ -119,7 +119,7 @@ const Calendar = {
     this.grid.innerHTML = html;
     GCal.need(U.dateStr(start), U.addDays(U.dateStr(start), rows * 7 - 1));
     this.sub.textContent = total ? `이번 달 ${total}개 중 ${done}개 완료` : "이번 달에 예정된 할 일이 없어요";
-    if (narrow) this.renderAgenda(byDate.get(this.selected) || []);
+    this.renderAgenda(byDate.get(this.selected) || []);
   },
   renderAgenda(tasks) {
     const ds = this.selected, list = [...tasks].sort((a, b) => ((a.status === "done") - (b.status === "done")) || ((!a.time) - (!b.time)) || (a.time || "").localeCompare(b.time || "") || Store.sortTasks(a, b));
@@ -185,7 +185,7 @@ const Calendar = {
     const agendaAct = e.target.closest(".cal-agenda [data-act]");
     if (agendaAct) {
       const a = agendaAct.dataset.act;
-      if (a === "agenda-add") { this.syncQuickAdd(); QuickAdd.input.focus(); return; }
+      if (a === "agenda-add") { QuickAdd.openWith({ due: this.selected }); return; }
       const row = agendaAct.closest(".cal-agenda-task"), t = row && Store.task(row.dataset.id); if (!t) return;
       if (a === "agenda-open") App.openTask(t.id);
       else if (a === "agenda-check") { if (t.status === "done") Store.uncompleteTask(t.id); else App.completeTask(t.id, agendaAct); }
