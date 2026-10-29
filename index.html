@@ -20,6 +20,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/calendar-ux.css">
+<link rel="stylesheet" href="css/experience.css">
+<link rel="stylesheet" href="css/mobile-stability.css">
 </head>
 <body data-view="today">
 <div id="intro" class="intro" aria-hidden="true">
@@ -94,6 +97,7 @@
 </header>
 
 <section id="listView" class="listview" hidden aria-label="모든 할 일 목록"></section>
+<aside id="demoBanner" class="demo-banner" hidden aria-label="예시 둘러보기"><span><i aria-hidden="true"></i><b>예시로 둘러보는 중</b><small>자유롭게 살펴보세요</small></span><button type="button">내 할 일로 시작 <span aria-hidden="true">→</span></button></aside>
 <section id="nowbar" class="nowbar" hidden aria-label="지금 집중 중"></section>
 <section id="calendar" class="calendar" hidden aria-label="캘린더">
   <div class="cal-head">
@@ -112,17 +116,19 @@
 </section>
 
 <form id="cmd" class="cmd" autocomplete="off">
-  <button type="button" class="cmd-planet" id="cmdPlanet" aria-label="행성 선택"></button>
+  <button type="button" class="cmd-planet" id="cmdPlanet" aria-label="행성 선택" aria-expanded="false" aria-controls="popPlanet"></button>
   <input id="cmdInput" type="text" enterkeyhint="send" placeholder="새 할 일" aria-label="새 할 일">
-  <button type="button" class="cmd-chip prio" id="cmdPrio" aria-label="우선순위"></button>
-  <button type="button" class="cmd-chip" id="cmdDate" aria-label="마감일"><span data-ico="calendar"></span><span class="txt">오늘</span></button>
+  <button type="button" class="cmd-chip prio" id="cmdPrio" aria-label="우선순위" aria-expanded="false" aria-controls="popPrio"></button>
+  <button type="button" class="cmd-chip" id="cmdDate" aria-label="마감일" aria-expanded="false" aria-controls="popDate"><span data-ico="calendar"></span><span class="txt">오늘</span></button>
   <button type="submit" class="cmd-go" aria-label="추가"><span data-ico="plus"></span></button>
   <div class="pop" id="popPlanet" hidden></div>
   <div class="pop" id="popDate" hidden></div>
   <div class="pop" id="popPrio" hidden></div>
+  <span id="cmdHint" class="sr-only" aria-live="polite" aria-atomic="true"></span>
 </form>
 
-<aside id="sheet" class="sheet" hidden aria-label="상세 패널">
+<div id="sheetBackdrop" class="sheet-backdrop" hidden aria-hidden="true"></div>
+<aside id="sheet" class="sheet" hidden tabindex="-1" aria-label="상세 패널">
   <div class="sheet-grip" id="sheetGrip" aria-hidden="true"><i></i></div>
   <div class="sheet-inner" id="sheetInner"></div>
 </aside>
@@ -137,7 +143,7 @@
 
 <div id="modal" class="modal" hidden>
   <div class="modal-backdrop" data-close></div>
-  <div class="modal-card" id="modalCard" role="dialog" aria-modal="true"></div>
+  <div class="modal-card" id="modalCard" role="dialog" aria-modal="true" tabindex="-1"></div>
 </div>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
@@ -152,6 +158,8 @@
 <script src="js/gl3d.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/scene.js"></script>
+<script src="js/viewport.js"></script>
+<script src="js/accessibility.js"></script>
 <script src="js/panel.js"></script>
 <script src="js/calendar.js"></script>
 <script src="js/calsync.js"></script>

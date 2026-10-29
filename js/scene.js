@@ -1,5 +1,5 @@
-/* ═══════════════ 3D 우주 씬: 원근 카메라 · 동심 궤도의 행성계 · 위성(할 일) · 태양(집중) · 드래그 앤 드롭 ═══════════════
-   월드 단위: 태양 반지름 2. 행성은 태양을 중심으로 한 동심 궤도에 놓이고, 계 전체가 아주 천천히 회전한다. */
+/* ═══════════════ 3D 우주 씬: 원근 카메라 · 하나의 궤도를 함께 도는 행성들 · 위성(할 일) · 태양(집중) · 드래그 앤 드롭 ═══════════════
+   월드 단위: 태양 반지름 2. 모든 행성은 태양을 중심으로 한 하나의 궤도 위에 고르게 놓이고, 계 전체가 아주 천천히 회전한다. */
 "use strict";
 
 const Scene = {
@@ -11,7 +11,7 @@ const Scene = {
   par: { x: 0, y: 0, tx: 0, ty: 0 }, narrow: false, touch: false, reduced: false, panelOpen: false, area: null,
   lastPos: new Map(), launch: null, q: 1, perf: { ema: 1 / 60, t: 0 }, idleAt: 0,
   SHELL_CAP: [6, 9, 12, 16, 22], DBL: 300, nowH: 0,
-  v3d: { az: 0, el: 0, zoom: 1, taz: 0, tel: 0, tzoom: 1 }, focusId: null, fRef: null, ft: 0, autoRotate: true, orbitDrag: null, pinch: null, ptrs: new Map(),
+  v3d: { az: 0, el: 0, zoom: 1, taz: 0, tel: 0, tzoom: 1 }, focusId: null, fRef: null, ft: 0, autoRotate: true, orbitDrag: null, pinch: null, ptrs: new Map(), PINCH_SPAN: 24,
 
   init() {
     this.stage = document.getElementById("stage"); this.cvGL = document.getElementById("gl");
@@ -36,7 +36,7 @@ const Scene = {
   },
   skyTex() { return Math.max(screen.width, screen.height) * (window.devicePixelRatio || 1) > 2400 && !this.touch ? TEX.sky : TEX.sky2k; },
   seed(id, k) { let h = 2166136261; const s = id + ":" + k; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return ((h >>> 0) % 10000) / 10000; },
-  panelW() { return Math.min(420, this.W * 0.36); },
+  panelW() { const panel = document.getElementById("sheet"); return panel && !panel.hidden ? panel.offsetWidth : Math.min(420, this.W * 0.36); },
   setNames(on) { this.showNames = on; Store.setSetting("moonNames", on); },
 
   /* ── 크기 · 카메라 ── */
@@ -54,21 +54,43 @@ const Scene = {
     this.layout();
     if (this._narrow !== this.narrow) { this._narrow = this.narrow; if (this.order.length) this.sync({}); }
   },
-  orbitR(i) { return this.narrow ? 6.6 + i * 2.05 : 9 + i * 2.7; },
+  /* 모든 행성은 태양을 도는 하나의 궤도 위에 고르게 놓인다.
+     반지름은 이웃한 두 행성(위성 궤도까지)이 겹치지 않고, 태양과도 떨어질 만큼만 잡는다 */
+  extent(s) { return s.shells ? this.shellR(s, s.shells - 1) * 1.16 + 0.35 : s.R * 1.45; },
+  ringR(ids) {
+    const n = ids.length, ex = ids.map(id => { const s = this.systems.get(id); return s ? this.extent(s) : 1; }), gap = this.narrow ? 0.45 : 0.8;
+    let r = this.sun.R * 1.75 + Math.max(1, ...ex) + gap;
+    if (n > 1) { let pair = 0; for (let i = 0; i < n; i++) pair = Math.max(pair, ex[i] + ex[(i + 1) % n]); r = Math.max(r, (pair + gap) / (2 * Math.sin(Math.PI / n))); }
+    return r;
+  },
+  slotAng(i, n) { return Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2; },
   shellR(s, i) { return s.R * (this.narrow ? 1.55 : 1.7) + 0.25 + i * (this.narrow ? 0.62 : 0.62); },
   moonR(t) { return ([0.24, 0.32, 0.27, 0.22][t.priority || 0]) * (this.narrow ? 1.45 : 1.12) * (this.touch ? 1.1 : 1); },
   layout() {
     const burning = this.orbs.size > 0, n = this.order.length;
-    const top = this.narrow ? 108 : 92, bottom = this.H - (this.narrow ? 84 : 100) - (burning ? this.nowH : 0) - (this.narrow ? this.dockH || 0 : 0);
-    const left = this.narrow ? 6 : 28 + (this.boardW || 0), right = this.W - (this.narrow ? 6 : 28) - (this.panelOpen && !this.narrow ? this.panelW() : 0);
+    const top = this.narrow ? 108 : 92, bottom = this.H - (this.narrow ? 84 : 100) - (burning ? this.nowH : 0) - (this.narrow ? this.dockH || 0 : 0) - (this.hintIdle ? 42 : 0);
+    const left = this.narrow ? 6 : 28 + (this.panelOpen && this.W <= 1100 ? 0 : this.boardW || 0), right = this.W - (this.narrow ? 6 : 28) - (this.panelOpen && !this.narrow ? this.panelW() : 0);
     this.area = { top, bottom, left, right };
-    /* 궤도 반지름은 순서로, 각도는 만든 순서로 정한다 → 순서를 바꾸면 행성이 제자리에서 안팎으로만 움직인다 */
-    const birth = Store.state.planets.map(p => p.id), pd = this.drag && this.drag.kind === "planet" && !this.drag.pending ? this.drag : null;
-    (pd ? this.slotOrder(pd) : this.order).forEach((id, i) => { const s = this.systems.get(id); if (!s) return; const k = Math.max(0, birth.indexOf(id)); s.orbit = this.orbitR(i); s.ang0 = Math.PI / 2 + (k / Math.max(1, n)) * Math.PI * 2 + k * 0.35; s.R = (this.narrow ? 1.5 : 1.02) * s.body.size; });
-    const asp = (right - left) / Math.max(1, bottom - top);
+    /* 순서대로 한 궤도 위 자리를 차지한다(끄는 중이면 미리 보기 순서) */
+    const pd = this.drag && this.drag.kind === "planet" && !this.drag.pending ? this.drag : null, ids = pd ? this.slotOrder(pd) : this.order;
+    ids.forEach(id => { const s = this.systems.get(id); if (s) s.R = (this.narrow ? 1.35 : 1.02) * s.body.size; });
+    /* 하나의 고리가 잘 보이게 조금 더 위에서 내려다본다 */
+    const asp = (right - left) / Math.max(1, bottom - top), el = U.lerp(1.02, 0.52, U.clamp((asp - 0.6) / 1.1, 0, 1));
+    /* 앞 · 뒤 행성이 화면에서 태양과 겹치지 않을 만큼 고리를 키운다(내려다보는 각도가 낮을수록 더) */
+    const maxR = Math.max(0.8, ...ids.map(id => (this.systems.get(id) || { R: 0.8 }).R));
+    const ring = Math.max(this.ringR(ids), (this.sun.R * 1.12 + maxR * 1.05 + 0.45) / Math.sin(el)); this.ring = ring;
+    ids.forEach((id, i) => { const s = this.systems.get(id); if (!s) return; s.orbit = ring; s.ang0 = this.slotAng(i, n); });
+    if (this.cameraEditing()) { this._fitDeferred = true; return; }
+    this._fitDeferred = false;
+    this._fitArea = { ...this.area };
     this.cam.fov = this.narrow ? 0.6 : 0.4;
-    this.cam.tEl = U.lerp(1.0, 0.44, U.clamp((asp - 0.6) / 1.1, 0, 1));
+    this.cam.tEl = el;
     this.fitCamera();
+  },
+  cameraEditing() {
+    if (typeof ViewportState !== "undefined") return ViewportState.keyboard || (this.touch && ViewportState.editable(document.activeElement));
+    const el = document.activeElement;
+    return this.touch && !!(el?.isContentEditable || el?.matches?.('textarea, select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"])'));
   },
   matrices(D, el, az, sx, sy, tg = [0, 0, 0]) {
     const eye = [tg[0] + Math.sin(az) * Math.cos(el) * D, tg[1] + Math.sin(el) * D, tg[2] + Math.cos(az) * Math.cos(el) * D];
@@ -82,7 +104,7 @@ const Scene = {
     const pts = [];
     for (let i = 0; i < 48; i++) { const t = i / 48 * Math.PI * 2; pts.push([Math.cos(t) * rmax, 0.8, Math.sin(t) * rmax], [Math.cos(t) * rmax, -0.6, Math.sin(t) * rmax]); }
     pts.push([0, this.sun.R * 2.4, 0], [0, -this.sun.R * 2.2, 0]);
-    const hw = (a.right - a.left) / this.W, hh = (a.bottom - a.top) / this.H, el = this.cam.tEl;
+    const hw = U.clamp((a.right - a.left) / this.W, 0.15, 1), hh = U.clamp((a.bottom - a.top) / this.H, 0.2, 1), el = this.cam.tEl;
     const box = D => {
       const { VP } = this.matrices(D, el, this.cam.az0, 0, 0); let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
       for (const p of pts) { const c = M4.xf(VP, p[0], p[1], p[2]); if (c[3] <= 0.05) return null; const x = c[0] / c[3], y = c[1] / c[3]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -154,7 +176,9 @@ const Scene = {
     this.sun.heatT = doing.length ? Math.min(1, 0.55 + 0.15 * (doing.length - 1)) : 0;
     this.renderFocus(doing); this.updateHint();
     const burning = doing.length > 0;
-    if (prev !== this.order.join(",") || d.type === "reset" || d.type === "init" || this._burning !== burning || d.type === "task-add" || d.type === "task-remove") { this._burning = burning; this.layout(); }
+    /* 위성 궤도 수가 바뀌면 고리 반지름도 달라지므로 다시 배치한다 */
+    const shells = [...this.systems.values()].map(s => s.shells).join(",");
+    if (prev !== this.order.join(",") || shells !== this._shells || d.type === "reset" || d.type === "init" || this._burning !== burning || d.type === "task-add" || d.type === "task-remove") { this._burning = burning; this._shells = shells; this.layout(); }
   },
   takeFrom(id) {
     let p = this.lastPos.get(id); this.lastPos.delete(id);
@@ -207,14 +231,18 @@ const Scene = {
   updateHint() {
     const el = this.hint, d = this.drag && !this.drag.pending ? this.drag : null;
     let txt = "", sub = "";
-    if (d && d.kind === "planet") { txt = "원하는 궤도에 놓으세요"; sub = "태양에 가까운 궤도일수록 앞 순서예요"; }
+    if (d && d.kind === "planet") { txt = "원하는 자리에 놓으세요"; sub = "다른 행성들이 궤도를 따라 비켜 줘요"; }
     else if (d) { txt = d.kind === "orb" ? "행성에 놓으면 궤도로 돌아가요" : d.sunTarget ? "놓으면 점화돼요" : "태양에 놓으면 집중을 시작해요"; sub = d.kind === "orb" ? "타이머는 일시정지돼요" : "다른 행성에 놓으면 카테고리가 바뀌어요"; }
-    else if (!this.orbs.size && !this.focusId) {
+    else if (!this.orbs.size && !this.focusId && !this.isOverlay()) {
       const any = [...this.systems.values()].some(s => s.moons.size);
+      /* 한 번이라도 점화해 본 사람에게는 「끌어 오세요」 안내를 다시 띄우지 않는다 */
+      if (any && Store.state.settings.ignited) { el.hidden = true; if (this.hintIdle) { this.hintIdle = false; this.layout(); } return; }
       txt = any ? "위성을 태양으로 끌어 오세요" : (this.view === "today" ? "오늘 남은 할 일이 없어요" : "할 일이 없어요");
       sub = any ? "놓는 순간 집중 타이머가 시작돼요" : "아래 입력창에서 새 할 일을 추가해 보세요";
     }
     el.hidden = !txt; el.classList.toggle("active", !!(d && d.sunTarget));
+    /* 평소 안내가 떠 있으면 그만큼 우주를 위로 올려 앞쪽 행성을 가리지 않게 */
+    const idle = !!txt; if (!d && idle !== !!this.hintIdle) { this.hintIdle = idle; this.layout(); }   /* 끄는 동안에는 시점을 흔들지 않는다 */
     if (txt && (el._t !== txt || el._s !== sub)) { el._t = txt; el._s = sub; el.innerHTML = `<b>${txt}</b><span>${sub}</span>`; }
   },
   burstAt(x, y, color, big) {
@@ -273,8 +301,15 @@ const Scene = {
     sun.heat += (sun.heatT - sun.heat) * Math.min(1, dt * 1.4);
     const sp = this.project(sun.p); sun.sx = sp.x; sun.sy = sp.y; sun.w = sp.w; sun.sr = sun.R * cam.focal / sp.w;
     for (const s of this.systems.values()) {
-      const ang = s.ang0 + this.carousel, bob = Math.sin(t * s.bob[1] + s.bob[0]) * 0.24 * fl;
-      s.p = V3.lerp(s.p, [Math.cos(ang) * s.orbit, bob, Math.sin(ang) * s.orbit], Math.min(1, dt * (t - s.born < 3 ? 2.4 : 4)));
+      /* 고리를 따라 각도 · 반지름을 옮긴다 → 자리를 바꿔도 태양을 가로지르지 않고 궤도 위로 미끄러진다.
+         끄는 행성은 손가락이 가리키는 각도를 따라간다 */
+      const dragMe = this.drag && this.drag.kind === "planet" && !this.drag.pending && this.drag.id === s.id && this.drag.ang != null;
+      const goal = dragMe ? this.drag.ang : s.ang0, bob = Math.sin(t * s.bob[1] + s.bob[0]) * 0.24 * fl;
+      if (s.a == null) s.a = goal;
+      const kp = Math.min(1, dt * (t - s.born < 3 ? 2.4 : dragMe ? 14 : 4.5)), da = Math.atan2(Math.sin(goal - s.a), Math.cos(goal - s.a));
+      s.a += da * kp; s.r = (s.r || 0) + (s.orbit - (s.r || 0)) * kp;
+      const ang = s.a + this.carousel;
+      s.p = [Math.cos(ang) * s.r, bob, Math.sin(ang) * s.r];
       const want = (s.hover || s.labelHover || s.pinned || s.id === this.focusId || (this.drag && (this.drag.target === s || (this.drag.kind === "planet" && !this.drag.pending && this.drag.id === s.id)))) ? 1 : 0;
       s.h += (want - s.h) * Math.min(1, dt * 5);
       s.rot = s.rot0 + t * Math.PI * 2 / s.body.spin;
@@ -341,7 +376,7 @@ const Scene = {
     for (const o of this.orbs.values()) { if (d && d.id === o.id) continue; G3.drawPlanet({ model: M4.model(o.p, 0, t * 0.6, 0.3), mesh: G3.M.lo, tex: TEX.moon, fire: 0.8 + 0.12 * Math.sin(t * 6 + o.sr), time: tt }); }
     G3.translucent();
     for (const s of this.systems.values()) if (s.body.ring) G3.drawRing({ model: M4.model(s.p, s.tilt, 0, s.Rd), tex: s.body.ring, center: s.p, R: s.Rd });
-    for (const s of this.systems.values()) { const on = d && d.kind === "planet" && d.id === s.id; G3.drawLine({ model: M4.model([0, 0, 0], 0, 0, s.orbit), center: [0, 0, 0], color: on ? s.oc : [0.72, 0.78, 0.95], alpha: on ? 0.8 : 0.16 + 0.14 * s.h }); }
+    if (this.systems.size) { const pl = d && d.kind === "planet"; G3.drawLine({ model: M4.model([0, 0, 0], 0, 0, this.ring || 9), center: [0, 0, 0], color: pl ? hexRGB(d.color).map(v => 0.6 + v * 0.4) : [0.72, 0.78, 0.95], alpha: pl ? 0.55 : 0.24 }); }
     for (const s of this.systems.values()) for (let i = 0; i < s.shells; i++) G3.drawLine({ model: M4.basis(s.p, s.u, s.n, s.v, this.shellR(s, i) * s.spread), center: s.p, color: s.oc, alpha: 0.2 + 0.3 * s.h });
     G3.drawGlow({ pos: sun.p, size: sun.R * 3.4, mode: 0, scale: 3.4, time: tt, heat });
     for (const s of this.systems.values()) {
@@ -383,7 +418,8 @@ const Scene = {
     this.cullLabels();
     this.placeTags();
     const sun = this.sun;
-    this.hint.style.transform = `translate3d(${sun.sx.toFixed(1)}px, ${(sun.sy + sun.sr * 1.55 + 14).toFixed(1)}px, 0) translateX(-50%)`;
+    /* 안내는 행성을 가리지 않게 우주 영역 아래쪽 가운데에 작은 알약으로 */
+    const A = this.area; this.hint.style.transform = `translate3d(${((A.left + A.right) / 2).toFixed(1)}px, ${(A.bottom - 4).toFixed(1)}px, 0) translate(-50%, -100%)`;
     const hv = this.hover;
     if (hv && !this.drag && !this.touch) {
       const o = hv.kind === "moon" ? hv.sys && hv.sys.moons.get(hv.id) : hv.kind === "orb" ? this.orbs.get(hv.id) : null;
@@ -404,7 +440,7 @@ const Scene = {
     /* 화면 위에 떠 있는 UI(보드 · 시점 버튼 · 집중 바)는 1초마다 다시 재서 이름표가 그 밑으로 숨지 않게 한다 */
     if (!this._obT || this.time - this._obT > 1) {
       this._obT = this.time;
-      this._ob = ["board", "boardPill", "viewCtl", "nowbar", "focusChip"].map(id => document.getElementById(id)).filter(el => el && !el.hidden).map(el => el.getBoundingClientRect()).filter(q => q.width > 0).map(q => [q.left, q.top, q.right, q.bottom]);
+      this._ob = [...["board", "boardPill", "viewCtl", "nowbar", "focusChip", "demoBanner", "sheet", "sunHint"].map(id => document.getElementById(id)), document.querySelector(".topbar")].filter(el => el && !el.hidden).map(el => el.getBoundingClientRect()).filter(q => q.width > 0).map(q => [q.left, q.top, q.right, q.bottom]);
     }
     placed.push(...this._ob);
     const anchor = (s, f, d) => [s.sx + (f ? -1 : 1) * s.sr * 0.72, s.sy + (d ? 1 : -1) * s.sr * 0.72];
@@ -429,7 +465,8 @@ const Scene = {
             const q = rect(s, f, d, w, h);
             if (m === 0 ? !(q[0] > 4 && q[2] < W - 4 && q[1] > A.top - 24 && q[3] < A.bottom + 30) : !(q[0] > -8 && q[2] < W + 8 && q[1] > 36)) continue;
             if (placed.some(p => hit(p, q))) continue;
-            if (m === 0 && discs.some(p => p[4] !== s.id && hit(p, q))) continue;
+            /* 할 일 줄까지 보일 땐 모든 천체를, 이름만 보일 땐 태양만 피한다 */
+            if (discs.some(p => p[4] !== s.id && (m === 0 || p[4] === "sun") && hit(p, q))) continue;
             if (m === 1 && hit(discs[0], q)) continue;
             mode = m; ori = [f, d]; box = q; break search;
           }
@@ -484,7 +521,14 @@ const Scene = {
   },
   drawTargets(ctx) {
     const d = this.drag, t = this.time, sun = this.sun;
-    if (d.kind === "planet") return;
+    if (d.kind === "planet") {
+      /* 놓으면 들어갈 자리 */
+      const s = this.systems.get(d.id); if (!s) return;
+      const a = s.ang0 + this.carousel, p = this.project([Math.cos(a) * this.ring, 0, Math.sin(a) * this.ring]), r = s.R * this.cam.focal / p.w;
+      ctx.save(); ctx.strokeStyle = d.color; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.5; ctx.setLineDash([3, 5]); ctx.lineDashOffset = -t * 14;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.2 + 9, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      return;
+    }
     ctx.save();
     if (d.kind === "moon") {
       const on = d.sunTarget; ctx.strokeStyle = on ? "rgba(255,220,160,.95)" : "rgba(255,200,140,.45)"; ctx.lineWidth = on ? 1.8 : 1.2;
@@ -504,17 +548,18 @@ const Scene = {
     if (id && (!this.systems.has(id) || this.isOverlay())) id = null;
     this.focusId = id;
     const chip = document.getElementById("focusChip");
+    this.updateHint();
     if (!id) { chip.hidden = true; return; }
     const s = this.systems.get(id);
     chip.innerHTML = `<button type="button" class="fc-back" data-act="back">${ico("chevLeft", 15)}전체 보기</button><span class="fc-sep"></span>${thumbImg(s.key, 18)}<span class="fc-name">${U.esc(s.planet.name)}</span><span class="fc-en">${s.body.ko}</span>`;
     chip.hidden = false;
   },
   focusDist(s) {
-    const a = this.area, hw = (a.right - a.left) / this.W, hh = (a.bottom - a.top) / this.H, asp = this.W / this.H;
+    const a = this.cameraEditing() && this._fitArea ? this._fitArea : this.area, hw = U.clamp((a.right - a.left) / this.W, 0.15, 1), hh = U.clamp((a.bottom - a.top) / this.H, 0.2, 1), asp = this.W / this.H;
     const E = (s.shells ? this.shellR(s, s.shells - 1) * 1.16 : s.R * 1.4) + s.R * 0.5 + 0.9;
     return Math.max(E * 2.2, E / (Math.tan(this.cam.fov / 2) * Math.min(hh, hw * asp) * 0.7));
   },
-  areaCenter() { const a = this.area; return [(a.left + a.right) / this.W - 1, 1 - (a.top + a.bottom) / this.H]; },
+  areaCenter() { const a = this.cameraEditing() && this._fitArea ? this._fitArea : this.area; return [(a.left + a.right) / this.W - 1, 1 - (a.top + a.bottom) / this.H]; },
   resetView() { const v = this.v3d, TAU = Math.PI * 2; v.taz = Math.round(v.az / TAU) * TAU; v.tel = 0; v.tzoom = 1; this.focusOn(null); },
   flyIn(ms = 2600) { if (!this.reduced) this.fly = { t0: performance.now(), ms, z: 3.2, a: -1.15, e: 0.34 }; },
   zoomBy(f) { this.v3d.tzoom = U.clamp(this.v3d.tzoom * f, 0.45, 1.8); },
@@ -522,20 +567,75 @@ const Scene = {
   setAutoRotate(on) { this.autoRotate = on; Store.setSetting("autoRotate", on); App.paintSpin(); },
   /* 빈 공간을 끌면 시점 회전, 제자리에서 두 번 누르면 전체 보기 */
   startOrbit(x0, y0, id, moved = false) {
+    this.endOrbit(); this.cancelPendingClick();
+    if (moved) this._tap = 0;
     this.orbitDrag = { x0, y0, az0: this.v3d.taz, el0: this.v3d.tel, moved, id }; if (moved) document.body.classList.add("orbiting");
     const mv = ev => {
       const o = this.orbitDrag; if (!o || ev.pointerId !== o.id || this.pinch) return;
       const dx = ev.clientX - o.x0, dy = ev.clientY - o.y0; if (!o.moved && Math.hypot(dx, dy) < 4) return;
+      if (!o.moved) { this.cancelPendingClick(); this._tap = 0; }
       o.moved = true; document.body.classList.add("orbiting");
       this.v3d.taz = o.az0 - dx * 0.0055; this.v3d.tel = U.clamp(o.el0 + dy * 0.0045, -0.38, 0.75);
     };
     const up = ev => {
-      if (this.orbitDrag && ev.pointerId !== this.orbitDrag.id) return;
-      window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
-      const o = this.orbitDrag; this.orbitDrag = null; document.body.classList.remove("orbiting");
-      if (o && !o.moved) { const now = performance.now(); if (now - (this._tap || 0) < 320) this.resetView(); this._tap = now; }
+      if (!this.orbitDrag || ev.pointerId !== this.orbitDrag.id) return;
+      const o = this.endOrbit();
+      if (ev.type === "pointercancel" || this._multiTouch) { this.cancelPendingClick(); this._tap = 0; this.suppressSceneClick(); return; }
+      if (!o.moved) {
+        const now = performance.now(), last = this._tapPos;
+        if (this._tap && now - this._tap < 320 && last && Math.hypot(o.x0 - last.x, o.y0 - last.y) < 30) this.resetView();
+        this._tap = now; this._tapPos = { x: o.x0, y: o.y0 };
+      }
     };
+    this._orbitMove = mv; this._orbitUp = up;
     window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
+  },
+  endOrbit() {
+    const o = this.orbitDrag; this.orbitDrag = null;
+    window.removeEventListener("pointermove", this._orbitMove); window.removeEventListener("pointerup", this._orbitUp); window.removeEventListener("pointercancel", this._orbitUp);
+    this._orbitMove = this._orbitUp = null; document.body.classList.remove("orbiting");
+    return o;
+  },
+  cancelPendingClick() { clearTimeout(this._clickT); this._clickT = null; this._click = null; },
+  suppressSceneClick() { this._suppressClickUntil = performance.now() + 450; this._plDragT = performance.now(); },
+  /* Capture before label handlers so both fingers always share one gesture. */
+  trackPointer(e) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (this.ptrs.has(e.pointerId)) return;
+    this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (this.ptrs.size < 2) return;
+    this.cancelPendingClick(); this._tap = 0;
+    if (this.drag) this.abortDrag(); this.endOrbit();
+    this._multiTouch = true; this.suppressSceneClick();
+    if (!this.pinch) {
+      const [a, b] = [...this.ptrs.values()], distance = Math.hypot(a.x - b.x, a.y - b.y);
+      this.pinch = { d0: distance, z0: this.v3d.zoom, active: distance >= this.PINCH_SPAN };
+      this.v3d.tzoom = this.v3d.zoom;
+    }
+    e.preventDefault(); e.stopPropagation();
+  },
+  movePointer(e) {
+    const p = this.ptrs.get(e.pointerId); if (!p) return;
+    p.x = e.clientX; p.y = e.clientY;
+    if (!this.pinch || this.ptrs.size < 2) return;
+    const [a, b] = [...this.ptrs.values()], distance = Math.hypot(a.x - b.x, a.y - b.y), pinch = this.pinch;
+    if (!pinch.active) {
+      if (distance < this.PINCH_SPAN) return;
+      pinch.active = true; pinch.d0 = distance; pinch.z0 = this.v3d.zoom; return;
+    }
+    /* Follow the fingers directly, without zoom continuing after they lift. */
+    this.v3d.zoom = this.v3d.tzoom = U.clamp(pinch.z0 * pinch.d0 / Math.max(this.PINCH_SPAN, distance), 0.45, 1.8);
+  },
+  releasePointer(e) {
+    if (!this.ptrs.has(e.pointerId)) return;
+    this.ptrs.delete(e.pointerId);
+    if (this._multiTouch) this.suppressSceneClick();
+    if (this.ptrs.size < 2) this.pinch = null;
+    else if (this.pinch) {
+      const [a, b] = [...this.ptrs.values()], distance = Math.hypot(a.x - b.x, a.y - b.y);
+      this.pinch = { d0: distance, z0: this.v3d.zoom, active: distance >= this.PINCH_SPAN };
+    }
+    if (!this.ptrs.size) this._multiTouch = false;
   },
 
   /* ── 선택 · 호버 ── */
@@ -575,15 +675,14 @@ const Scene = {
   bind() {
     window.addEventListener("resize", () => this.measure());
     const st = this.stage;
+    st.addEventListener("pointerdown", e => this.trackPointer(e), true);
+    st.addEventListener("click", e => { if (e.detail && (this._multiTouch || performance.now() < (this._suppressClickUntil || 0))) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
     st.addEventListener("pointermove", e => this.onMove(e));
     st.addEventListener("pointerleave", () => { this.systems.forEach(s => { s.hover = false; }); if (!this.drag) this.setHover(null); st.style.cursor = ""; });
     st.addEventListener("pointerdown", e => this.onDown(e));
     st.addEventListener("wheel", e => { e.preventDefault(); this.zoomBy(Math.exp(e.deltaY * (e.ctrlKey ? 0.01 : 0.0012))); }, { passive: false });
-    st.addEventListener("pointermove", e => {
-      const p = this.ptrs.get(e.pointerId); if (p) { p.x = e.clientX; p.y = e.clientY; }
-      if (this.pinch && this.ptrs.size >= 2) { const [a, b] = [...this.ptrs.values()]; this.v3d.tzoom = U.clamp(this.pinch.z0 * this.pinch.d0 / (Math.hypot(a.x - b.x, a.y - b.y) || 1), 0.45, 1.8); }
-    });
-    const lift = e => { this.ptrs.delete(e.pointerId); if (this.ptrs.size < 2) this.pinch = null; };
+    st.addEventListener("pointermove", e => this.movePointer(e));
+    const lift = e => this.releasePointer(e);
     window.addEventListener("pointerup", lift); window.addEventListener("pointercancel", lift);
     this.tags.addEventListener("pointerdown", e => {
       const tag = e.target.closest(".mtag"); if (!tag) return; e.stopPropagation();
@@ -614,11 +713,7 @@ const Scene = {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (e.target.closest("button, a, input, .fcard, .p-label, .mtag")) return;
     const x = e.clientX, y = e.clientY;
-    this.ptrs.set(e.pointerId, { x, y });
-    if (this.ptrs.size >= 2) {
-      if (this.drag) this.abortDrag(); this.orbitDrag = null; document.body.classList.remove("orbiting");
-      const [a, b] = [...this.ptrs.values()]; this.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: this.v3d.tzoom }; return;
-    }
+    this.trackPointer(e); if (this.pinch || this._multiTouch) return;
     if (e.pointerType !== "mouse") { const ns = this.nearSystem(x, y); this.systems.forEach(s => { s.pinned = s === ns; }); }
     let hit = this.pick(x, y); const c = this._click;
     if (c && performance.now() - c.t < this.DBL && Math.hypot(x - c.x, y - c.y) < (e.pointerType === "mouse" ? 22 : 30) && (!hit || hit.id !== c.id)) hit = { kind: c.kind, id: c.id, sys: c.sysId ? this.systems.get(c.sysId) : null };
@@ -627,15 +722,18 @@ const Scene = {
   },
   startPending(e, o) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    this.trackPointer(e); if (this.pinch || this._multiTouch) return;
     e.preventDefault();
     /* 위성은 누른 채 조금만 움직이면 바로 들린다(기다릴 필요 없음). 패드로 탁 탁 두드려 끌어도 같다 */
     const grab = o.kind === "moon" || o.kind === "orb", c = this._click, second = !!(grab && c && c.id === o.id);
     if (second) { clearTimeout(this._clickT); this._click = null; }
-    this.drag = Object.assign({ pending: true, grab, second, oy: e.pointerType === "mouse" ? 0 : -46, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, target: null, sunTarget: false, t0: performance.now() }, o);
+    if (this.drag) this.abortDrag();
+    this.drag = Object.assign({ pointerId: e.pointerId, pending: true, grab, second, oy: e.pointerType === "mouse" ? 0 : -46, x0: e.clientX, y0: e.clientY, lx: e.clientX, ly: e.clientY, target: null, sunTarget: false, t0: performance.now() }, o);
     this._mv = ev => this.onDragMove(ev); this._up = ev => this.onUp(ev);
     window.addEventListener("pointermove", this._mv); window.addEventListener("pointerup", this._up); window.addEventListener("pointercancel", this._up);
   },
   beginDrag(d) {
+    this.cancelPendingClick(); this._tap = 0;
     d.pending = false;
     const t = Store.task(d.id), p = t && Store.planet(t.planetId); d.color = p ? pColor(p) : "#ffffff";
     this.ghost.className = "drag-ghost lift" + (d.kind === "orb" ? " is-orb" : ""); this.ghost.style.setProperty("--c", d.color);
@@ -645,11 +743,11 @@ const Scene = {
     if (d.kind === "orb") this.focus.querySelector(`.fcard[data-id="${d.id}"]`)?.classList.add("lifted");
   },
   onDragMove(e) {
-    const d = this.drag; if (!d) return;
+    const d = this.drag; if (!d || e.pointerId !== d.pointerId || this.pinch || this._multiTouch) return;
     if (d.pending) {
       d.lx = e.clientX; d.ly = e.clientY;
       if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < (e.pointerType === "mouse" ? 4 : 8)) return;
-      /* 행성을 끌면 다른 궤도로 옮겨 순서를 바꾼다(가까이 보기 · 캘린더 · 목록 화면에서는 시점 회전) */
+      /* 행성을 끌면 궤도를 따라 다른 자리로 옮겨 순서를 바꾼다(가까이 보기 · 캘린더 · 목록 화면에서는 시점 회전) */
       if (d.kind === "planet" && this.order.length > 1 && !this.focusId && !this.isOverlay()) this.beginPlanet(d);
       else if (!d.grab) { const o = d; this.endDrag(); this.startOrbit(o.x0, o.y0, e.pointerId, true); return; }
       else this.beginDrag(d);
@@ -667,7 +765,8 @@ const Scene = {
     if (!this.reduced && Math.random() < 0.55) FX.trail(x, y, sunT ? "#ffd08a" : d.color);
   },
   onUp(e) {
-    const d = this.drag; if (!d) return;
+    const d = this.drag; if (!d || e.pointerId !== d.pointerId) return;
+    if (e.type === "pointercancel") { this.abortDrag(); this.cancelPendingClick(); this._tap = 0; this.suppressSceneClick(); return; }
     this.endDrag();
     if (d.pending) {
       if (d.grab) {
@@ -681,46 +780,53 @@ const Scene = {
     }
     if (d.kind === "planet") {
       this._plDragT = performance.now();
-      if (e.type !== "pointercancel" && d.slot !== d.from) Store.reorderPlanets(this.slotOrder(d), d.id); else this.layout();
+      if (d.slot !== d.from) Store.reorderPlanets(this.slotOrder(d), d.id); else this.layout();
       return;
     }
-    if (e.type === "pointercancel") return;
     this.drop(d, { clientX: e.clientX, clientY: e.clientY + (d.oy || 0) });
   },
-  cancelDrag() { if (this.drag && !this.drag.pending) { this.abortDrag(); return true; } return false; },
+  cancelDrag() { if (this.drag || this._click) { this.abortDrag(); this.cancelPendingClick(); return true; } return false; },
   /* 놓지 않고 그만둘 때: 미리 옮겨 둔 궤도를 원래대로 */
   abortDrag() { const pl = this.drag && this.drag.kind === "planet" && !this.drag.pending; this.endDrag(); if (pl) this.layout(); },
   /* ── 행성 끌어 순서 바꾸기 ── */
   beginPlanet(d) {
+    this.cancelPendingClick(); this._tap = 0;
     d.pending = false; d.target = null; d.sunTarget = false;
     const s = this.systems.get(d.id); d.color = s.body.color; d.from = this.order.indexOf(d.id); d.slot = d.from;
     this.ghost.className = "drag-ghost lift is-planet"; this.ghost.style.setProperty("--c", d.color);
-    this.ghost.innerHTML = `${thumbImg(s.key, 30)}<span class="g-title">${U.esc(s.planet.name)}</span><span class="g-slot"></span>`;
+    this.ghost.innerHTML = `<span class="g-title">${thumbImg(s.key, 18)}${U.esc(s.planet.name)}</span><span class="g-slot"></span>`;
     this.ghost.hidden = false; document.body.classList.add("dragging"); this.setHover(null); this.tip.hidden = true;
     if (d.oy) try { if (navigator.vibrate) navigator.vibrate(10); } catch (_) { /* 지원 안 함 */ }
     this.paintSlot(d); this.updateHint();
   },
-  /* 화면 위 손가락 자리 → 궤도 평면(y = 0) 위 태양까지의 거리 → 가장 가까운 궤도 */
-  planeR(x, y) {
+  /* 화면 위 손가락 자리 → 궤도 평면(y = 0) 위 점 → 태양 기준 각도(고리가 도는 만큼 뺀 값). 평면을 벗어나면 null */
+  planeAng(x, y) {
     const eye = this.cam.eye, dir = V3.sub(this.unproject(x, y, 1), eye);
-    if (dir[1] > -1e-4) return 1e9;
-    const t = -eye[1] / dir[1]; return Math.hypot(eye[0] + dir[0] * t, eye[2] + dir[2] * t);
+    if (dir[1] > -1e-4) return null;
+    const t = -eye[1] / dir[1]; return Math.atan2(eye[2] + dir[2] * t, eye[0] + dir[0] * t) - this.carousel;
   },
   slotOrder(d) { const ids = this.order.filter(id => id !== d.id); ids.splice(d.slot, 0, d.id); return ids; },
   movePlanet(d, e) {
-    const x = e.clientX, y = e.clientY + (d.oy || 0), n = this.order.length, a0 = this.orbitR(0), st = this.orbitR(1) - a0;
+    const x = e.clientX, y = e.clientY + (d.oy || 0), n = this.order.length, TAU = Math.PI * 2;
     this.ghost.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-    const slot = U.clamp(Math.round((this.planeR(x, y) - a0) / st), 0, n - 1);
+    const a = this.planeAng(x, y); if (a == null) return;
+    d.ang = a;
+    const slot = ((Math.round((a - Math.PI / 2) / (TAU / n)) % n) + n) % n;
     if (slot !== d.slot) {
       d.slot = slot;
-      /* 미리 보기: 다른 행성들이 비켜 주고 끄는 행성은 그 궤도로 미끄러진다 */
-      this.slotOrder(d).forEach((id, i) => { const s = this.systems.get(id); if (s) s.orbit = this.orbitR(i); });
+      /* 미리 보기: 다른 행성들이 고리를 따라 비켜 주고, 놓으면 끄는 행성이 그 자리에 들어간다 */
+      this.slotOrder(d).forEach((id, i) => { const s = this.systems.get(id); if (s) s.ang0 = this.slotAng(i, n); });
       this.paintSlot(d);
       try { if (d.oy && navigator.vibrate) navigator.vibrate(6); } catch (_) { /* 지원 안 함 */ }
     }
-    if (!this.reduced && Math.random() < 0.4) FX.trail(x, y, d.color);
+    if (!this.reduced && Math.random() < 0.3) FX.trail(x, y, d.color);
   },
-  paintSlot(d) { const g = this.ghost.querySelector(".g-slot"); if (g) g.textContent = d.slot === d.from ? "제자리" : `${d.slot + 1}번째 궤도`; },
+  /* 「공부 · 운동 사이」처럼 놓일 자리를 이웃 행성 이름으로 알려 준다 */
+  paintSlot(d) {
+    const g = this.ghost.querySelector(".g-slot"); if (!g) return;
+    const ids = this.slotOrder(d), n = ids.length, nm = id => (this.systems.get(id) || {}).planet?.name || "";
+    g.textContent = d.slot === d.from ? "제자리" : n === 2 ? "자리 바꾸기" : `${nm(ids[(d.slot + n - 1) % n])} · ${nm(ids[(d.slot + 1) % n])} 사이`;
+  },
   drop(d, e) {
     this.ghost.classList.remove("lift");
     const t = Store.task(d.id); if (!t) return;

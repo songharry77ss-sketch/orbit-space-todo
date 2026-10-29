@@ -3,7 +3,15 @@
 
 const Now = {
   el: null,
-  init() { this.el = $("#nowbar"); this.el.addEventListener("click", e => this.onClick(e)); },
+  init() {
+    this.el = $("#nowbar"); this.el.addEventListener("click", e => this.onClick(e));
+    this.observer = new ResizeObserver(() => this.measure()); this.observer.observe(this.el);
+  },
+  measure() {
+    const height = !this.el.hidden && document.body.classList.contains("has-now") ? this.el.offsetHeight : 0;
+    document.body.style.setProperty("--now-height", `${height}px`);
+    Scene.setNowH(height ? height + 12 : 0); Board.place();
+  },
   primary(doing) { const id = Store.state.settings.nowId; return doing.find(t => t.id === id) || doing.slice().sort((a, b) => b.startedAt - a.startedAt)[0]; },
   render() {
     const doing = Store.tasks().filter(t => t.status === "doing");
@@ -13,7 +21,7 @@ const Now = {
       /* 끝내거나 멈추면 바가 아래로 가라앉으며 사라진다 */
       if (!this.el.hidden && doing.length === 0 && !this.el.classList.contains("leaving")) { this.el.classList.add("leaving"); clearTimeout(this._lt); this._lt = setTimeout(() => { this.el.classList.remove("leaving"); if (!Store.tasks().some(x => x.status === "doing") || App.view === "calendar" || App.view === "list") this.el.hidden = true; Board.place(); }, 280); }
       else if (doing.length) this.el.hidden = true;
-      this._id = null; Scene.setNowH(0); return;
+      this._id = null; this.measure(); return;
     }
     clearTimeout(this._lt); this.el.classList.remove("leaving"); this.el.hidden = false;
     const t = this.primary(doing), p = Store.planet(t.planetId), others = doing.filter(x => x.id !== t.id).sort((a, b) => a.startedAt - b.startedAt);
@@ -32,7 +40,7 @@ const Now = {
       </div>
       ${next ? `<div class="nb-step"><button type="button" class="nb-scheck" data-act="step" data-sid="${next.id}" aria-label="이 단계 완료" title="이 단계 완료">${ico("check", 11)}</button><span class="nb-sk">다음 단계</span><span class="nb-st">${U.esc(next.title)}</span><span class="num nb-sn">${sd}/${t.steps.length}</span></div>` : ""}
       ${others.length ? `<div class="nb-others"><span class="nb-ok">함께 집중 중</span>${others.map(o => { const op = Store.planet(o.planetId); return `<button type="button" class="nb-chip" data-act="switch" data-id="${o.id}" title="크게 보기"><i class="pd" style="--c:${op ? pColor(op) : "#fff"}"></i><span class="tt">${U.esc(o.title)}</span><span class="num" data-live="${o.id}">${U.fmtClock(Store.burned(o))}</span></button>`; }).join("")}</div>` : ""}`;
-    requestAnimationFrame(() => { Scene.setNowH(this.el.hidden ? 0 : this.el.offsetHeight + 12); Board.place(); });
+    requestAnimationFrame(() => this.measure());
   },
   /* 불덩이가 태양에 닿는 순간 집중 바도 함께 타오른다 */
   ignite() { if (this.el.hidden) return; this.el.classList.remove("ignite"); void this.el.offsetWidth; this.el.classList.add("ignite"); clearTimeout(this._it); this._it = setTimeout(() => this.el.classList.remove("ignite"), 1400); },

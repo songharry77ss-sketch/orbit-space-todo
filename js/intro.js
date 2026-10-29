@@ -21,7 +21,7 @@ const Intro = {
   exit(el, reduced) {
     this.done = true;
     try { localStorage.setItem("orbit.intro", "1"); } catch (e) {}
-    if (!reduced) Scene.flyIn(2600);
+    Scene.fly = null;
     el.classList.add("out");
     document.body.classList.add("intro-fade");
     setTimeout(() => { document.body.classList.remove("intro-on"); this.finish(); }, reduced ? 0 : 700);

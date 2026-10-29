@@ -77,11 +77,11 @@ const U = {
       [/\s내일(?=\s)/, () => U.addDays(today, 1)],
       [/\s모레(?=\s)/, () => U.addDays(today, 2)],
       [/\s글피(?=\s)/, () => U.addDays(today, 3)],
-      [/\s다음\s?주(?=\s)/, () => U.addDays(today, 7)],
       [/\s(\d{1,2})\s?\/\s?(\d{1,2})(?=\s)/, (m) => { const [mm, dd] = m.slice(1).map(Number); return U.makeDate(mm, dd); }],
       [/\s(\d{1,2})월\s?(\d{1,2})일(?=\s)/, (m) => { const [mm, dd] = m.slice(1).map(Number); return U.makeDate(mm, dd); }],
       [/\s(\d{1,2})일(?=\s)/, (m) => { const d = U.parseDate(today); return U.makeDate(d.getMonth() + 1, Number(m[1])); }],
       [/\s(다음\s?주\s?)?([일월화수목금토])요일(?=\s)/, (m) => { const wd = WEEKDAYS.indexOf(m[2]); return U.nextWeekday(today, wd, !!m[1]); }],
+      [/\s다음\s?주(?=\s)/, () => U.addDays(today, 7)],
     ];
     for (const [re, fn] of dateRules) {
       const m = t.match(re);

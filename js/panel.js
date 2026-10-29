@@ -5,10 +5,12 @@ const Panel = {
   el: null, inner: null, mode: null, id: null, date: null, showDone: false, timers: {}, _key: "",
   init() {
     this.el = document.getElementById("sheet"); this.inner = document.getElementById("sheetInner");
+    document.getElementById("sheetBackdrop").addEventListener("click", () => this.close());
     this.inner.addEventListener("click", e => this.onClick(e));
     this.inner.addEventListener("input", e => this.onInput(e));
     this.inner.addEventListener("change", e => this.onChange(e));
     this.inner.addEventListener("keydown", e => this.onKey(e));
+    window.addEventListener("resize", () => { if (!this.el.hidden) this.updateScope(); });
     this.bindGrip();
   },
   open(mode, id, date) {
@@ -17,11 +19,22 @@ const Panel = {
     this.render();
     if (!was) { this.el.hidden = false; this.el.style.transform = ""; document.body.classList.add("sheet-open"); Scene.setPanel(true); }
     this.inner.querySelectorAll("textarea.task-title").forEach(x => this.autosize(x));
+    this.el.setAttribute("role", "dialog");
+    this.el.setAttribute("aria-label", mode === "task" ? `할 일 상세: ${Store.task(id)?.title || ""}` : mode === "today" ? "오늘의 미션" : mode === "day" ? `${U.fmtDate(date)} 할 일` : "할 일 상세");
+    FocusScope.open(this.el, { modal: window.innerWidth <= 1100, initial: this.el });
+    this.updateScope();
+  },
+  updateScope() {
+    const modal = window.innerWidth <= 1100;
+    this.el.setAttribute("aria-modal", String(modal)); document.body.classList.toggle("sheet-modal", modal);
+    document.getElementById("sheetBackdrop").hidden = !modal; FocusScope.setModal(this.el, modal); Scene.layout();
   },
   close() {
     if (this.el.hidden) return;
     this.el.hidden = true; this.mode = null; this.id = null; this._key = "";
-    document.body.classList.remove("sheet-open"); Scene.setPanel(false); Scene.focusOn(null);
+    document.body.classList.remove("sheet-open"); Scene.setPanel(false);
+    document.body.classList.remove("sheet-modal"); document.getElementById("sheetBackdrop").hidden = true;
+    FocusScope.close(this.el);
   },
   refresh() {
     if (!this.mode) return;
@@ -30,6 +43,7 @@ const Panel = {
     this.render();
   },
   render() {
+    const focus = this.inner.contains(document.activeElement) ? FocusScope.remember() : null;
     const old = this.inner.querySelector(".sh-body"), st = old ? old.scrollTop : 0, key = `${this.mode}:${this.id}:${this.date}`;
     if (this.mode === "task") this.renderTask();
     else if (this.mode === "planet") this.renderPlanet();
@@ -39,6 +53,7 @@ const Panel = {
     const nb = this.inner.querySelector(".sh-body"); if (nb && key === this._key) nb.scrollTop = st;
     this._key = key;
     this.inner.querySelectorAll("textarea.task-title").forEach(t => this.autosize(t));
+    if (focus) FocusScope.restore(focus);
   },
   autosize(t) { t.style.height = "auto"; if (t.scrollHeight) t.style.height = `${t.scrollHeight}px`; },
   tick() {
@@ -227,6 +242,7 @@ ${extra}
     else if (f === "repeat") Store.updateTask(t.id, { repeat: el.value });
   },
   onKey(e) {
+    if (e.isComposing || e.keyCode === 229) return;
     const el = e.target;
     if ((e.key === "Enter" || e.key === " ") && el.matches(".row, .sec-h.toggle") && e.target === document.activeElement) { e.preventDefault(); el.click(); return; }
     if (e.key === "Enter" && el.matches("textarea.task-title")) { e.preventDefault(); el.blur(); return; }

@@ -13,14 +13,26 @@ const Store = {
       const raw = localStorage.getItem(this.KEY);
       if (raw) { const s = JSON.parse(raw); if (s && Array.isArray(s.planets) && Array.isArray(s.tasks)) this.state = s; }
     } catch (e) { /* 저장소 사용 불가 */ }
-    if (!this.state) this.state = this.seed();
-    this.state.settings = Object.assign({ view: "today", hintSeen: false }, this.state.settings || {});
+    if (!this.state) { this.state = this.fresh(); this.state.settings.welcomePending = true; }
+    this.state = this.normalize(this.state);
+  },
+  /* 가져오기와 초기화는 저장된 옛 데이터를 다시 읽지 않고 같은 정리만 적용한다. */
+  normalize(state) {
+    state.settings = Object.assign({ view: "today", hintSeen: false }, state.settings || {});
     // 행성 → 실제 천체 매핑 (이전 버전 데이터 이전)
-    const used = new Set(this.state.planets.filter(p => BODIES[p.body]).map(p => p.body));
-    this.planets().forEach(p => { if (!BODIES[p.body]) { p.body = BODY_ORDER.find(k => !used.has(k)) || "earth"; used.add(p.body); } delete p.emoji; delete p.look; delete p.color; });
-    this.state.tasks.forEach(t => { if (t.priority == null) t.priority = t.important ? 1 : 0; delete t.important; });
+    const used = new Set(state.planets.filter(p => BODIES[p.body]).map(p => p.body));
+    [...state.planets].sort((a, b) => a.order - b.order).forEach(p => { if (!BODIES[p.body]) { p.body = BODY_ORDER.find(k => !used.has(k)) || "earth"; used.add(p.body); } delete p.emoji; delete p.look; delete p.color; });
+    state.tasks.forEach(t => { if (t.priority == null) t.priority = t.important ? 1 : 0; delete t.important; });
     const cutoff = Date.now() - 60 * 86400000;
-    this.state.tasks = this.state.tasks.filter(t => !(t.status === "done" && t.completedAt && t.completedAt < cutoff));
+    state.tasks = state.tasks.filter(t => !(t.status === "done" && t.completedAt && t.completedAt < cutoff));
+    return state;
+  },
+  fresh() {
+    const now = Date.now();
+    return {
+      planets: [["업무", "earth"], ["공부", "jupiter"], ["운동", "mars"], ["생활", "neptune"], ["취미", "saturn"]].map(([name, body], order) => ({ id: U.uid(), name, body, order, createdAt: now })),
+      tasks: [], settings: { view: "today", hintSeen: false },
+    };
   },
   save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.state)); } catch (e) { /* 무시 */ } },
   on(fn) { this.listeners.push(fn); },
@@ -93,7 +105,7 @@ const Store = {
     const prev = this.planets().map(p => p.id);
     if (!this.setPlanetOrder(ids)) return false;
     const p = this.planet(movedId), i = this.planets().findIndex(x => x.id === movedId);
-    if (typeof App !== "undefined") App.toast("orbit", p ? `「${p.name}」 행성을 ${i + 1}번째 궤도로 옮겼어요` : "행성 순서를 바꿨어요", () => this.setPlanetOrder(prev));
+    if (typeof App !== "undefined") App.toast("orbit", p ? `「${p.name}」 행성을 ${i + 1}번째 자리로 옮겼어요` : "행성 순서를 바꿨어요", () => this.setPlanetOrder(prev));
     return true;
   },
   removePlanet(id, moveToId) {
@@ -116,7 +128,7 @@ const Store = {
     this.emit({ type: "task-add", id: t.id });
     return t;
   },
-  updateTask(id, patch, meta = {}) { const t = this.task(id); if (!t) return; Object.assign(t, patch); this.emit(Object.assign({ type: "task-update", id }, meta)); },
+  updateTask(id, patch, meta = {}) { const t = this.task(id); if (!t) return; if (Object.keys(patch).some(k => t[k] !== patch[k])) this.touchRecurrence(t); Object.assign(t, patch); this.emit(Object.assign({ type: "task-update", id }, meta)); },
   removeTask(id) {
     const t = this.task(id); if (!t) return null;
     this.state.tasks = this.state.tasks.filter(x => x.id !== id);
@@ -126,19 +138,23 @@ const Store = {
   restoreTask(t) { if (!this.task(t.id)) { this.state.tasks.push(t); this.emit({ type: "task-add", id: t.id }); } },
   startTask(id) {
     const t = this.task(id); if (!t || t.status === "doing") return;
+    this.touchRecurrence(t);
     if (t.status === "done") { t.completedAt = null; }
     t.status = "doing"; t.startedAt = Date.now();
     if (!t.myDay) t.myDay = U.today();
+    this.state.settings.ignited = true;
     this.emit({ type: "task-start", id });
   },
   stopTask(id) {
     const t = this.task(id); if (!t || t.status !== "doing") return;
+    this.touchRecurrence(t);
     t.burnSeconds = (t.burnSeconds || 0) + (Date.now() - (t.startedAt || Date.now())) / 1000;
     t.status = "todo"; t.startedAt = null;
     this.emit({ type: "task-stop", id });
   },
   completeTask(id) {
     const t = this.task(id); if (!t || t.status === "done") return null;
+    this.touchRecurrence(t);
     if (t.status === "doing") t.burnSeconds = (t.burnSeconds || 0) + (Date.now() - (t.startedAt || Date.now())) / 1000;
     t.status = "done"; t.startedAt = null; t.completedAt = Date.now();
     let spawned = null;
@@ -149,40 +165,52 @@ const Store = {
       else if (t.repeat === "weekly") next = U.addDays(base, 7);
       else if (t.repeat === "monthly") next = U.addMonths(base, 1);
       else if (t.repeat === "weekdays") { next = U.addDays(base, 1); while ([0, 6].includes(U.parseDate(next).getDay())) next = U.addDays(next, 1); }
-      spawned = {
-        id: U.uid(), title: t.title, notes: t.notes, planetId: t.planetId, due: next, time: t.time, priority: t.priority || 0,
-        myDay: null, status: "todo", startedAt: null, burnSeconds: 0, completedAt: null, steps: t.steps.map(s => ({ id: U.uid(), title: s.title, done: false })),
-        repeat: t.repeat, createdAt: Date.now(), parentId: t.id,
-      };
-      this.state.tasks.push(spawned);
+      /* 재완료해도 같은 회차를 두 번 만들지 않는다. 옮겨 둔 다음 회차도 원래 날짜로 찾는다.
+         옛 데이터에는 회차 날짜가 없으므로 연결된 자식이 있으면 보수적으로 유지한다. */
+      const existing = this.state.tasks.find(x => x.parentId === t.id && (!x.recurrenceDate || x.recurrenceDate === next));
+      if (!existing) {
+        spawned = {
+          id: U.uid(), title: t.title, notes: t.notes, planetId: t.planetId, due: next, time: t.time, priority: t.priority || 0,
+          myDay: null, status: "todo", startedAt: null, burnSeconds: 0, completedAt: null, steps: t.steps.map(s => ({ id: U.uid(), title: s.title, done: false })),
+          repeat: t.repeat, createdAt: Date.now(), parentId: t.id, recurrenceDate: next,
+        };
+        spawned.recurrenceSnapshot = this.recurrenceSignature(spawned);
+        this.state.tasks.push(spawned);
+      }
     }
     this.emit({ type: "task-complete", id, spawnedId: spawned?.id });
     return { task: t, spawned };
   },
   uncompleteTask(id, spawnedId) {
     const t = this.task(id); if (!t) return;
+    this.touchRecurrence(t);
     t.status = "todo"; t.completedAt = null;
-    if (spawnedId) this.state.tasks = this.state.tasks.filter(x => x.id !== spawnedId);
+    /* 사용자가 수정하거나 집중·완료한 다음 회차는 실행 취소로 지우지 않는다. */
+    this.state.tasks = this.state.tasks.filter(x => !(x.parentId === id && (!spawnedId || x.id === spawnedId) && !x.recurrenceTouched && x.recurrenceSnapshot && x.recurrenceSnapshot === this.recurrenceSignature(x) && !this.state.tasks.some(child => child.parentId === x.id)));
     this.emit({ type: "task-uncomplete", id });
   },
-  addStep(taskId, title) { const t = this.task(taskId); if (!t || !title.trim()) return; t.steps.push({ id: U.uid(), title: title.trim(), done: false }); this.emit({ type: "step", id: taskId }); },
-  updateStep(taskId, stepId, patch, meta = {}) { const t = this.task(taskId); const s = t?.steps.find(s => s.id === stepId); if (!s) return; Object.assign(s, patch); this.emit(Object.assign({ type: "step", id: taskId }, meta)); },
-  removeStep(taskId, stepId) { const t = this.task(taskId); if (!t) return; t.steps = t.steps.filter(s => s.id !== stepId); this.emit({ type: "step", id: taskId }); },
+  touchRecurrence(t) { if (t.parentId) t.recurrenceTouched = true; },
+  recurrenceSignature(t) {
+    return JSON.stringify([t.title, t.notes, t.planetId, t.due, t.time, t.priority, t.myDay, t.status, t.startedAt, t.burnSeconds, t.completedAt, t.steps, t.repeat]);
+  },
+  addStep(taskId, title) { const t = this.task(taskId); if (!t || !title.trim()) return; this.touchRecurrence(t); t.steps.push({ id: U.uid(), title: title.trim(), done: false }); this.emit({ type: "step", id: taskId }); },
+  updateStep(taskId, stepId, patch, meta = {}) { const t = this.task(taskId); const s = t?.steps.find(s => s.id === stepId); if (!s) return; if (Object.keys(patch).some(k => s[k] !== patch[k])) this.touchRecurrence(t); Object.assign(s, patch); this.emit(Object.assign({ type: "step", id: taskId }, meta)); },
+  removeStep(taskId, stepId) { const t = this.task(taskId); if (!t) return; this.touchRecurrence(t); t.steps = t.steps.filter(s => s.id !== stepId); this.emit({ type: "step", id: taskId }); },
 
   /* ── 데이터 ── */
   exportJSON() { return JSON.stringify(this.state, null, 2); },
   importJSON(text) {
     const s = JSON.parse(text);
     if (!s || !Array.isArray(s.planets) || !Array.isArray(s.tasks)) throw new Error("형식이 올바르지 않습니다");
-    this.state = s; this.load(); this.emit({ type: "reset" });
+    this.state = this.normalize(s); this.emit({ type: "reset" });
   },
   reset(withSample) {
     this.state = withSample ? this.seed() : { planets: [{ id: U.uid(), name: "할 일", body: "earth", order: 0, createdAt: Date.now() }], tasks: [], settings: {} };
-    this.load(); this.emit({ type: "reset" });
+    this.state = this.normalize(this.state); this.emit({ type: "reset" });
   },
 };
 
-/* ── 첫 실행 예시 데이터 ── */
+/* ── 사용자가 선택해서 불러오는 예시 데이터 ── */
 Store.seed = function () {
   const T = U.today(), now = Date.now(), d = n => U.addDays(T, n);
   const P = (name, body, order) => ({ id: U.uid(), name, body, order, createdAt: now });
@@ -203,7 +231,7 @@ Store.seed = function () {
     K(work, "이메일 답장 정리", { due: d(-1), priority: 2 }),
     K(work, "디자인 리뷰 피드백", { due: d(1), priority: 3 }),
     K(work, "분기 OKR 정리", { due: d(3) }),
-    K(study, "알고리즘 문제 3개 풀기", { due: T, priority: 2, status: "doing", startedAt: now - 12 * 60000, myDay: T, burnSeconds: 0 }),
+    K(study, "알고리즘 문제 3개 풀기", { due: T, priority: 2 }),
     K(study, "영어 단어 30개 암기", { due: T, repeat: "daily", priority: 3 }),
     K(study, "React 강의 2강 수강", { due: d(2) }),
     K(fit, "러닝 5km", { myDay: T, priority: 2 }),
@@ -217,5 +245,5 @@ Store.seed = function () {
     K(hobby, "사진 정리"),
     K(hobby, "책 『코스모스』 읽기", { due: d(7) }),
   ];
-  return { planets: [work, study, fit, life, hobby], tasks, settings: { view: "today", hintSeen: false } };
+  return { planets: [work, study, fit, life, hobby], tasks, settings: { view: "today", hintSeen: false, demoMode: true } };
 };

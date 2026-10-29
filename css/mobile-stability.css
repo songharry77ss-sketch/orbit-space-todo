@@ -1,0 +1,90 @@
+/* Keep the app shell stable while iOS focuses fields or shows its keyboard.
+   Page pinch zoom remains available; only the app's document scroll is locked. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+/* Enter the workspace with a short fade, without a zoom or flash. */
+.intro.out .in-core, .intro.out .in-stars { transform: none; transition: opacity .25s ease; }
+.intro.out .in-flash { animation: none; opacity: 0; }
+.intro.out .in-word, .intro.out .in-tag { transform: none; }
+
+/* Reflow immediately on rotation/keyboard resize instead of sliding from old coordinates. */
+.cmd, .nowbar, .view-ctl, .coach, .focus-chip, .toasts { transition-property: border-color, background-color, color, box-shadow, opacity; }
+
+@media (max-width: 639.98px), (any-pointer: coarse) {
+  html, body { width: 100%; max-width: 100%; height: 100%; overflow: hidden; }
+  body { position: fixed; inset: 0; }
+
+  /* Late, explicit precedence also covers inputs created by dialogs later.
+     Keep display text compact while editable text is readable without focus zoom. */
+  :root body :is(input:where(:not([type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"])), textarea, select, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]) {
+    font-size: max(16px, 1em) !important;
+  }
+  :root body textarea.task-title { font-size: max(19px, 1em) !important; }
+
+  #stage { bottom: auto; height: var(--scene-height, 100%); }
+
+  #coach {
+    left: max(8px, env(safe-area-inset-left, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+    top: auto;
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    max-width: 440px;
+    max-height: calc(var(--visible-height, 100dvh) - 70px - env(safe-area-inset-bottom, 0px) - max(8px, env(safe-area-inset-top, 0px)));
+    margin: 0 auto;
+    padding: 0 16px 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  #coach .coach-h {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    min-height: 52px;
+    margin: 0 -16px 8px;
+    padding: 6px 10px 6px 16px;
+    background: var(--panel-solid);
+  }
+  #coach .coach-h .icon-btn { width: 40px; height: 40px; }
+  #coach .coach-list li { grid-template-columns: minmax(88px, 0.9fr) minmax(0, 1.6fr); gap: 8px; }
+  #coach .coach-list li > * { min-width: 0; overflow-wrap: anywhere; }
+  #coach .coach-keys { min-width: 0; }
+  #coach .coach-foot { padding-bottom: 2px; }
+  #coach .coach-foot .btn { min-height: 44px; }
+
+  :root body .modal {
+    padding: max(8px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+  }
+  :root body .modal-card {
+    max-height: calc(var(--visible-height, 100dvh) - max(8px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)));
+    overscroll-behavior: contain;
+  }
+  :root body .palette {
+    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    padding-left: max(8px, env(safe-area-inset-left, 0px));
+    padding-right: max(8px, env(safe-area-inset-right, 0px));
+  }
+  :root body .pal-card {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(var(--visible-height, 100dvh) - 18px - env(safe-area-inset-top, 0px));
+  }
+  :root body .pal-field { flex: none; }
+  :root body .pal-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+  body.keyboard-open #cmd { bottom: calc(10px + var(--keyboard-inset, 0px)); }
+  body.keyboard-open .sheet {
+    top: auto;
+    bottom: var(--keyboard-inset, 0px);
+    height: min(86dvh, calc(var(--visible-height, 100dvh) - max(16px, calc(env(safe-area-inset-top, 0px) + 8px))));
+    max-height: calc(var(--visible-height, 100dvh) - max(16px, calc(env(safe-area-inset-top, 0px) + 8px)));
+    padding-bottom: 0;
+  }
+  body.keyboard-open #coach { display: none; }
+  :root body.keyboard-open .modal { padding-bottom: calc(var(--keyboard-inset, 0px) + 8px); }
+  :root body.keyboard-open .modal-card {
+    max-height: calc(var(--visible-height, 100dvh) - max(8px, env(safe-area-inset-top, 0px)) - 8px);
+  }
+}

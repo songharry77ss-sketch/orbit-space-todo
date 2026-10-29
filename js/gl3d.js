@@ -175,6 +175,8 @@ void main() {
   float d = dot(N, L), mu = clamp(dot(N, V), 0.0, 1.0);
   float lit = smoothstep(-0.12, 0.55, d) * (0.6 + 0.4 * clamp(d, 0.0, 1.0));
   lit *= 1.0 - uLimb * pow(1.0 - mu, 1.6);
+  /* 태양을 등진 앞쪽 행성도 형태와 무늬가 보이도록, 보는 쪽에서 은은한 보조광 */
+  lit = max(lit, 0.24 * pow(mu, 1.4));
   if (uRingOn > 0.5) {
     float dn = dot(Ls, uRingN);
     if (abs(dn) > 0.001) { float t = dot(uRingC - vW, uRingN) / dn; if (t > 0.0) { float rr = length(vW + Ls * t - uRingC); float tt = (rr - uRingR.x) / (uRingR.y - uRingR.x); if (tt > 0.0 && tt < 1.0) lit *= 1.0 - texture2D(uRingTex, vec2(tt, 0.5)).a * 0.75; } }
